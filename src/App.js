@@ -108,14 +108,11 @@ const sendTicketUpdateEmail = async (ticket, updateDescription) => {
   console.log(`Assunto: ${subject}`);
   console.log(`Corpo: ${body}`);
   const url = "https://script.google.com/macros/s/AKfycbxS1OA9AZEypzbyPGX5ypOhR8drk0o0IQpu_8iZe_QIAy8pfTGKZ_GCUduTdi3Xvur0/exec";
+  // Envia para ambos os e-mails
   const emails = ["findesk@guiainvest.com.br", ticket.emailSolicitante];
   try {
     await Promise.all(emails.map(email => {
-      const formdata = {
-        email,
-        subject,
-        message: body
-      };
+      const formdata = { email, subject, message: body };
       return fetch(url, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -139,7 +136,7 @@ function App() {
   const [tickets, setTickets] = useState([]);
   const [showNewTicketForm, setShowNewTicketForm] = useState(false);
 
-  // Campos para criação de chamado (o solicitante será currentUser)
+  // Campos para criação de chamado
   const [cargoDepartamento, setCargoDepartamento] = useState("");
   const [emailSolicitante, setEmailSolicitante] = useState("");
   const [descricaoProblema, setDescricaoProblema] = useState("");
@@ -154,7 +151,7 @@ function App() {
   // Gerenciamento das opções de cargo (permitindo "+Novo")
   const [cargoOptions, setCargoOptions] = useState(initialCargoOptions);
 
-  // Gerenciamento das opções de categoria (a opção "+Novo" será utilizada para adicionar nova categoria)
+  // Gerenciamento das opções de categoria (opção "+Novo" para adicionar nova categoria)
   const [categoryOptions, setCategoryOptions] = useState([
     "Clientes",
     "Comissões e/ou SplitC",
@@ -167,10 +164,10 @@ function App() {
   const [adminFilterCategory, setAdminFilterCategory] = useState("");
   const [adminFilterRequester, setAdminFilterRequester] = useState("");
 
-  // Controle de expansão dos chamados (modo resumo/detalhado)
+  // Controle de expansão dos chamados
   const [expandedTickets, setExpandedTickets] = useState({});
 
-  // Estado para as abas: "open" (chamados abertos/em andamento) e "closed" (chamados concluídos)
+  // Estado para as abas: "open" e "closed"
   const [activeTab, setActiveTab] = useState("open");
 
   // Estado para busca geral
@@ -179,7 +176,7 @@ function App() {
   // Estado para armazenar alterações temporárias feitas pelo admin
   const [adminEdits, setAdminEdits] = useState({});
 
-  // Carrega os tickets salvos do localStorage ao iniciar o App
+  // Carrega os tickets do localStorage
   useEffect(() => {
     const savedTickets = localStorage.getItem('tickets');
     if (savedTickets) {
@@ -187,7 +184,7 @@ function App() {
     }
   }, []);
 
-  // Salva os tickets no localStorage sempre que houver alteração
+  // Salva os tickets no localStorage
   useEffect(() => {
     localStorage.setItem('tickets', JSON.stringify(tickets));
   }, [tickets]);
@@ -203,12 +200,12 @@ function App() {
     }));
   };
 
-  // Validação do login: nome e sobrenome mínimos
+  // Validação do login
   const validateLoginName = (name) => {
     return name.trim().split(" ").length >= 2;
   };
 
-  // Altera a expansão do ticket
+  // Alterna a expansão do ticket
   const toggleTicketExpansion = (ticketId) => {
     setExpandedTickets(prev => ({ ...prev, [ticketId]: !prev[ticketId] }));
   };
@@ -256,7 +253,7 @@ function App() {
     setNewCommentFiles(Array.from(e.target.files));
   };
 
-  // Criação de um novo chamado
+  // Cria um novo chamado
   const handleCreateTicket = (e) => {
     e.preventDefault();
     const dataDeAbertura = new Date();
@@ -292,7 +289,7 @@ function App() {
     sendTicketUpdateEmail(newTicket, "Abertura de novo chamado");
   };
 
-  // Reabre um chamado (para usuários)
+  // Reabre um chamado (usuários)
   const handleReopenTicket = (ticketId) => {
     if (!newComment.trim()) {
       alert("Para reabrir o chamado, insira informações adicionais para que o admin possa avaliar o caso.");
@@ -323,10 +320,9 @@ function App() {
     setNewCommentFiles([]);
   };
 
-  // Adiciona um comentário ou atualiza o chamado (incluindo edições do admin)
+  // Adiciona comentário ou atualiza chamado (incluindo edições do admin)
   const handleAddComment = (ticketId) => {
     if (!newComment.trim()) return;
-
     const ticket = tickets.find(t => t.id === ticketId);
 
     if (isAdmin) {
@@ -384,7 +380,7 @@ function App() {
     setNewCommentFiles([]);
   };
 
-  // Atualiza diretamente o ticket (para os edits do admin)
+  // Atualiza chamado diretamente (para os edits do admin)
   const handleAdminUpdate = (ticketId, field, value) => {
     setTickets(prev =>
       prev.map(ticket =>
@@ -393,7 +389,7 @@ function App() {
     );
   };
 
-  // Exclui um chamado (somente admin)
+  // Exclui chamado (somente admin)
   const handleDeleteTicket = async (ticketId, ticket) => {
     if (window.confirm("Tem certeza que deseja excluir este chamado?")) {
       await sendTicketUpdateEmail(ticket, "Chamado excluído pelo admin");
@@ -401,13 +397,13 @@ function App() {
     }
   };
 
-  // Filtra os tickets: admin vê todos; usuário, apenas os seus
+  // Filtra tickets: admin vê todos; usuário, apenas os seus
   const visibleTickets = tickets.filter(ticket => {
     if (isAdmin) return true;
     return ticket.nomeSolicitante === currentUser;
   });
 
-  // Filtra os tickets pela aba ativa (aberto/em andamento vs concluído)
+  // Filtra pela aba ativa
   const tabFilteredTickets = visibleTickets.filter(ticket => {
     const isConcluded =
       ticket.status === "Concluído" &&
@@ -567,10 +563,24 @@ function App() {
           </div>
 
           <div className="flex gap-4 mb-4 w-full max-w-5xl">
-            <button onClick={() => setActiveTab("open")} className="px-3 py-1 rounded" style={activeTab === "open" ? { backgroundColor: "#0E1428", color: "white" } : { backgroundColor: "gray", color: "black" }}>
+            <button 
+              onClick={() => setActiveTab("open")} 
+              className="px-3 py-1 rounded" 
+              style={ activeTab === "open" 
+                ? { backgroundColor: "#0E1428", color: "white" } 
+                : { backgroundColor: "#f2f2f2", color: "#0E1428", border: "1px solid #0E1428" } 
+              }
+            >
               Abertos e em andamento
             </button>
-            <button onClick={() => setActiveTab("closed")} className="px-3 py-1 rounded" style={activeTab === "closed" ? { backgroundColor: "#0E1428", color: "white" } : { backgroundColor: "gray", color: "black" }}>
+            <button 
+              onClick={() => setActiveTab("closed")} 
+              className="px-3 py-1 rounded" 
+              style={ activeTab === "closed" 
+                ? { backgroundColor: "#0E1428", color: "white" } 
+                : { backgroundColor: "#f2f2f2", color: "#0E1428", border: "1px solid #0E1428" } 
+              }
+            >
               Concluídos
             </button>
           </div>
