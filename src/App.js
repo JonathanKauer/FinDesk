@@ -112,18 +112,25 @@ const sendTicketUpdateEmail = async (ticket, updateDescription) => {
   try {
     await Promise.all(emails.map(email => {
       const formdata = { email, subject, message: body };
-      return fetch(url, {
-        method: "POST",
-        mode: "cors",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(formdata)
-      });
-    }));
-  } catch (error) {
-    console.log("Erro ao enviar e-mails:", error);
-  }
-};
-
+      return fetch("https://script.google.com/macros/s/AKfycbz2xFbYeeP4sp8JdNeT2JxkeHk5SEDYrYOF37NizSPlAaG7J6KjekAWECVr6NPTJkUN/exec", {
+  method: 'POST',
+  mode: 'no-cors', // Isso evita o preflight OPTIONS
+  headers: {
+    "Content-Type": "application/json"
+  },
+  body: JSON.stringify({
+    email: "test@example.com",
+    subject: "Teste do Apps Script",
+    message: "Esta é uma mensagem de teste."
+  })
+})
+.then(response => {
+  // Como estamos em no-cors, a resposta será opaca
+  console.log("Requisição enviada com sucesso!");
+})
+.catch(error => {
+  console.error("Erro na requisição:", error);
+});
 function App() {
   // Estados de login
   const [currentUser, setCurrentUser] = useState(null);
