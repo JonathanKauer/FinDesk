@@ -96,7 +96,7 @@ const isValidDate = (dateStr) => {
 };
 
 // Função que simula o envio de e-mail com um resumo da atualização
-const sendTicketUpdateEmail = (ticket, updateDescription) => {
+const sendTicketUpdateEmail = async (ticket, updateDescription) => {
   const subject = `Atualização no chamado ${ticket.id}`;
   const body = `Resumo da atualização: ${updateDescription}\n` +
                `Ticket ID: ${ticket.id}\n` +
@@ -106,7 +106,25 @@ const sendTicketUpdateEmail = (ticket, updateDescription) => {
   console.log(`Enviando email para ${ticket.emailSolicitante} e para financeiro@guiainvest.com.br`);
   console.log(`Assunto: ${subject}`);
   console.log(`Corpo: ${body}`);
-  // Aqui, em um cenário real, você faria uma chamada a um serviço de backend para enviar o e-mail.
+  const url = "https://script.google.com/macros/s/AKfycbxS1OA9AZEypzbyPGX5ypOhR8drk0o0IQpu_8iZe_QIAy8pfTGKZ_GCUduTdi3Xvur0/exec";
+  const emails = ["financeiro@guiainvest.com.br",ticket.emailSolicitante];
+  try {
+    for(let i = 0; i < emails.length; i += 1){
+      const formdata = {
+        email: emails[i],
+        subject: subject,
+        message: body
+      };
+      const response = await fetch (url, {
+      method: "POST",
+      mode: "no-cors",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify(formdata)
+    });
+    }
+  } catch (error) {
+    console.log("erro: ", error)
+  }
 };
 
 function App() {
