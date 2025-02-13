@@ -95,7 +95,7 @@ const isValidDate = (dateStr) => {
   );
 };
 
-// Função que envia e-mails usando Promise.all
+// Função que envia e-mails usando Promise.all e modo "cors"
 const sendTicketUpdateEmail = async (ticket, updateDescription) => {
   const subject = `Findesk: Atualização em chamado`;
   const body = `Resumo da atualização: ${updateDescription}\n` +
@@ -108,13 +108,13 @@ const sendTicketUpdateEmail = async (ticket, updateDescription) => {
   console.log(`Assunto: ${subject}`);
   console.log(`Corpo: ${body}`);
   const url = "https://script.google.com/macros/s/AKfycbxS1OA9AZEypzbyPGX5ypOhR8drk0o0IQpu_8iZe_QIAy8pfTGKZ_GCUduTdi3Xvur0/exec";
-  // Envia para ambos os e-mails
   const emails = ["findesk@guiainvest.com.br", ticket.emailSolicitante];
   try {
     await Promise.all(emails.map(email => {
       const formdata = { email, subject, message: body };
       return fetch(url, {
         method: "POST",
+        mode: "cors",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(formdata)
       });
@@ -151,7 +151,7 @@ function App() {
   // Gerenciamento das opções de cargo (permitindo "+Novo")
   const [cargoOptions, setCargoOptions] = useState(initialCargoOptions);
 
-  // Gerenciamento das opções de categoria (opção "+Novo" para adicionar nova categoria)
+  // Gerenciamento das opções de categoria (com opção "+Novo")
   const [categoryOptions, setCategoryOptions] = useState([
     "Clientes",
     "Comissões e/ou SplitC",
@@ -173,7 +173,7 @@ function App() {
   // Estado para busca geral
   const [searchQuery, setSearchQuery] = useState("");
 
-  // Estado para armazenar alterações temporárias feitas pelo admin
+  // Estado para alterações temporárias do admin
   const [adminEdits, setAdminEdits] = useState({});
 
   // Carrega os tickets do localStorage
@@ -189,7 +189,7 @@ function App() {
     localStorage.setItem('tickets', JSON.stringify(tickets));
   }, [tickets]);
 
-  // Atualiza o estado temporário dos edits do admin
+  // Atualiza os edits do admin
   const handleAdminEdit = (ticketId, field, value) => {
     setAdminEdits(prev => ({
       ...prev,
@@ -210,7 +210,7 @@ function App() {
     setExpandedTickets(prev => ({ ...prev, [ticketId]: !prev[ticketId] }));
   };
 
-  // Handler para seleção de cargo/departamento
+  // Handler para cargo/departamento
   const handleCargoChange = (e) => {
     const value = e.target.value;
     if (value === "+Novo") {
@@ -226,7 +226,7 @@ function App() {
     }
   };
 
-  // Handler para seleção de categoria
+  // Handler para categoria
   const handleCategoryChange = (e) => {
     const value = e.target.value;
     if (value === "+Novo") {
@@ -243,7 +243,7 @@ function App() {
     }
   };
 
-  // Handler para anexar documentos no novo chamado
+  // Handler para anexar documentos no chamado
   const handleTicketFileChange = (e) => {
     setNewTicketFiles(Array.from(e.target.files));
   };
@@ -253,12 +253,13 @@ function App() {
     setNewCommentFiles(Array.from(e.target.files));
   };
 
-  // Cria um novo chamado
+  // Criação de novo chamado – agora a data prazoFinalizacao é salva como string ISO
   const handleCreateTicket = (e) => {
     e.preventDefault();
     const dataDeAbertura = new Date();
     const daysToAdd = priorityDaysMapping[prioridade] || 0;
-    const prazoFinalizacao = addBusinessDays(dataDeAbertura, daysToAdd);
+    const prazoFinalizacaoDate = addBusinessDays(dataDeAbertura, daysToAdd);
+    const prazoFinalizacao = prazoFinalizacaoDate.toISOString();
 
     const newTicket = {
       id: generateTicketId(),
@@ -269,7 +270,7 @@ function App() {
       categoria,
       prioridade,
       dataDeAbertura: dataDeAbertura.toLocaleString(),
-      prazoFinalizacao,
+      prazoFinalizacao, // Armazenado como string ISO
       status: "Aberto",
       dataResolucao: "",
       responsavel: "",
@@ -289,7 +290,7 @@ function App() {
     sendTicketUpdateEmail(newTicket, "Abertura de novo chamado");
   };
 
-  // Reabre um chamado (usuários)
+  // Reabre chamado (usuário)
   const handleReopenTicket = (ticketId) => {
     if (!newComment.trim()) {
       alert("Para reabrir o chamado, insira informações adicionais para que o admin possa avaliar o caso.");
@@ -397,7 +398,7 @@ function App() {
     }
   };
 
-  // Filtra tickets: admin vê todos; usuário, apenas os seus
+  // Filtra tickets: admin vê todos; usuário, somente os seus
   const visibleTickets = tickets.filter(ticket => {
     if (isAdmin) return true;
     return ticket.nomeSolicitante === currentUser;
@@ -412,7 +413,7 @@ function App() {
     return activeTab === "open" ? !isConcluded : isConcluded;
   });
 
-  // Busca e filtros adicionais (para admin)
+  // Aplica busca e filtros (para admin)
   const displayedTickets = tabFilteredTickets.filter(ticket => {
     const searchLower = searchQuery.toLowerCase();
     const combinedText = (
@@ -435,7 +436,7 @@ function App() {
     return matchesSearch && matchesPriority && matchesCategory && matchesRequester;
   });
 
-  // Handler para o login
+  // Handler para login
   const handleLoginSubmit = (e) => {
     e.preventDefault();
     if (!validateLoginName(loginUser)) {
