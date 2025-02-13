@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Helmet } from "react-helmet"; // Certifique-se de instalar o react-helmet
+import { Helmet } from "react-helmet";
 
 // Opções para Cargo/Departamento
 const initialCargoOptions = [
@@ -104,11 +104,11 @@ const sendTicketUpdateEmail = async (ticket, updateDescription) => {
                `Status: ${ticket.status}\n` +
                `Descrição: ${ticket.descricaoProblema}\n` +
                `Link de acesso: https://fin-desk.vercel.app/`;
-  console.log(`Enviando email para ${ticket.emailSolicitante} e para financeiro@guiainvest.com.br`);
+  console.log(`Enviando email para ${ticket.emailSolicitante} e para findesk@guiainvest.com.br`);
   console.log(`Assunto: ${subject}`);
   console.log(`Corpo: ${body}`);
   const url = "https://script.google.com/macros/s/AKfycbxS1OA9AZEypzbyPGX5ypOhR8drk0o0IQpu_8iZe_QIAy8pfTGKZ_GCUduTdi3Xvur0/exec";
-  const emails = ["financeiro@guiainvest.com.br",ticket.emailSolicitante];
+  const emails = ["findesk@guiainvest.com.br", ticket.emailSolicitante];
   try {
     for(let i = 0; i < emails.length; i += 1){
       const formdata = {
@@ -116,12 +116,12 @@ const sendTicketUpdateEmail = async (ticket, updateDescription) => {
         subject: subject,
         message: body
       };
-      const response = await fetch (url, {
-      method: "POST",
-      mode: "no-cors",
-      headers: {"Content-Type": "application/json"},
-      body: JSON.stringify(formdata)
-    });
+      await fetch(url, {
+        method: "POST",
+        mode: "no-cors",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify(formdata)
+      });
     }
   } catch (error) {
     console.log("erro: ", error)
@@ -155,7 +155,7 @@ function App() {
   // Gerenciamento das opções de cargo (permitindo "+Novo")
   const [cargoOptions, setCargoOptions] = useState(initialCargoOptions);
 
-  // Gerenciamento das opções de categoria (a opção "Outro" foi substituída por "Novo+")
+  // Gerenciamento das opções de categoria (a opção "+Novo" será utilizada para adicionar nova categoria)
   const [categoryOptions, setCategoryOptions] = useState([
     "Clientes",
     "Comissões e/ou SplitC",
@@ -180,6 +180,19 @@ function App() {
   // Estado para armazenar alterações temporárias feitas pelo admin
   // Estrutura: { [ticketId]: { status: string, dataResolucao: string } }
   const [adminEdits, setAdminEdits] = useState({});
+
+  // Carrega os tickets salvos do localStorage ao iniciar o App
+  useEffect(() => {
+    const savedTickets = localStorage.getItem('tickets');
+    if (savedTickets) {
+      setTickets(JSON.parse(savedTickets));
+    }
+  }, []);
+
+  // Salva os tickets no localStorage sempre que houver alteração
+  useEffect(() => {
+    localStorage.setItem('tickets', JSON.stringify(tickets));
+  }, [tickets]);
 
   // Função para atualizar o estado temporário dos edits do admin
   const handleAdminEdit = (ticketId, field, value) => {
@@ -218,14 +231,14 @@ function App() {
     }
   };
 
-  // Handler para seleção de categoria (se "Novo+" for selecionado, solicita o nome da nova categoria)
+  // Handler para seleção de categoria
   const handleCategoryChange = (e) => {
     const value = e.target.value;
-    if (value === "Novo+") {
+    if (value === "+Novo") {
       const novaCategoria = prompt("Digite a nova categoria:");
       if (novaCategoria) {
-        const optionsWithoutNovo = categoryOptions.filter(opt => opt !== "Novo+");
-        setCategoryOptions([...optionsWithoutNovo, novaCategoria, "Novo+"]);
+        const optionsWithoutNovo = categoryOptions.filter(opt => opt !== "+Novo");
+        setCategoryOptions([...optionsWithoutNovo, novaCategoria, "+Novo"]);
         setCategoria(novaCategoria);
       } else {
         setCategoria("");
@@ -282,7 +295,7 @@ function App() {
     setNewTicketFiles([]);
     setShowNewTicketForm(false);
 
-    sendTicketUpdateEmail(newTicket,"Abertura de novo chamado");
+    sendTicketUpdateEmail(newTicket, "Abertura de novo chamado");
   };
 
   // Função para reabrir um chamado (disponível para usuários)
@@ -387,6 +400,15 @@ function App() {
         ticket.id === ticketId ? { ...ticket, [field]: value } : ticket
       )
     );
+  };
+
+  // Função para excluir um chamado (somente admin)
+  const handleDeleteTicket = async (ticketId, ticket) => {
+    if (window.confirm("Tem certeza que deseja excluir este chamado?")) {
+      // Envia e-mail notificando a exclusão
+      await sendTicketUpdateEmail(ticket, "Chamado excluído pelo admin");
+      setTickets(prev => prev.filter(t => t.id !== ticketId));
+    }
   };
 
   // Filtra os tickets para exibição: admin vê todos; usuário, apenas os seus
@@ -650,7 +672,7 @@ function App() {
               return (
                 <motion.div
                   key={ticket.id}
-                  className="shadow p-4 rounded-2xl"
+                  className="relative shadow p-4 rounded-2xl"
                   style={{ backgroundColor: isExpired ? '#ffe6e6' : 'white' }}
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
@@ -670,9 +692,17 @@ function App() {
                       <p className="text-gray-700"><span className="font-semibold">Data de Abertura:</span> {ticket.dataDeAbertura}</p>
                       <p className="text-gray-700"><span className="font-semibold">Prazo Final:</span> {new Date(ticket.prazoFinalizacao).toLocaleDateString()}</p>
                     </div>
-                    <button className="px-2 py-1 bg-gray-300 rounded">
-                      {expandedTickets[ticket.id] ? "Ocultar" : "Ver Detalhes"}
-                    </button>
+                    <div className="flex items-center gap-2">
+                      <button className="px-2 py-1 bg-gray-300 rounded">
+                        {expandedTickets[ticket.id] ? "Ocultar" : "Ver Detalhes"}
+                      </button>
+                      {/* Ícone de exclusão (somente admin) */}
+                      {isAdmin && (
+                        <button onClick={(e) => { e.stopPropagation(); handleDeleteTicket(ticket.id, ticket); }} className="p-1" title="Excluir chamado">
+                          <img src="/trash-icon.png" alt="Excluir chamado" className="w-6 h-6" />
+                        </button>
+                      )}
+                    </div>
                   </div>
 
                   {expandedTickets[ticket.id] && (
@@ -802,5 +832,3 @@ function App() {
 }
 
 export default App;
-
-
