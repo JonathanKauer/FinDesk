@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Helmet } from "react-helmet";
+import { Helmet } from "react-helmet"; // Certifique-se de instalar o react-helmet
 
 // Opções para Cargo/Departamento
 const initialCargoOptions = [
@@ -405,7 +405,6 @@ function App() {
   // Função para excluir um chamado (somente admin)
   const handleDeleteTicket = async (ticketId, ticket) => {
     if (window.confirm("Tem certeza que deseja excluir este chamado?")) {
-      // Envia e-mail notificando a exclusão
       await sendTicketUpdateEmail(ticket, "Chamado excluído pelo admin");
       setTickets(prev => prev.filter(t => t.id !== ticketId));
     }
@@ -678,7 +677,7 @@ function App() {
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.3 }}
                 >
-                  <div className="flex justify-between items-center cursor-pointer" onClick={() => toggleTicketExpansion(ticket.id)}>
+                  <div className="flex justify-between items-center">
                     <div>
                       {isAdmin ? (
                         <>
@@ -688,17 +687,36 @@ function App() {
                       ) : (
                         <h2 className="text-xl font-bold">ID: {ticket.id}</h2>
                       )}
-                      <p className="text-gray-700"><span className="font-semibold">Categoria:</span> {ticket.categoria} | <span className="font-semibold">Prioridade:</span> {ticket.prioridade}</p>
-                      <p className="text-gray-700"><span className="font-semibold">Data de Abertura:</span> {ticket.dataDeAbertura}</p>
-                      <p className="text-gray-700"><span className="font-semibold">Prazo Final:</span> {new Date(ticket.prazoFinalizacao).toLocaleDateString()}</p>
+                      <p className="text-gray-700">
+                        <span className="font-semibold">Categoria:</span> {ticket.categoria} |{" "}
+                        <span className="font-semibold">Prioridade:</span> {ticket.prioridade}
+                      </p>
+                      <p className="text-gray-700">
+                        <span className="font-semibold">Data de Abertura:</span> {ticket.dataDeAbertura}
+                      </p>
+                      <p className="text-gray-700">
+                        <span className="font-semibold">Prazo Final:</span> {new Date(ticket.prazoFinalizacao).toLocaleDateString()}
+                      </p>
                     </div>
                     <div className="flex items-center gap-2">
-                      <button className="px-2 py-1 bg-gray-300 rounded">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          toggleTicketExpansion(ticket.id);
+                        }}
+                        className="px-2 py-1 bg-gray-300 rounded"
+                      >
                         {expandedTickets[ticket.id] ? "Ocultar" : "Ver Detalhes"}
                       </button>
-                      {/* Ícone de exclusão (somente admin) */}
                       {isAdmin && (
-                        <button onClick={(e) => { e.stopPropagation(); handleDeleteTicket(ticket.id, ticket); }} className="p-1" title="Excluir chamado">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteTicket(ticket.id, ticket);
+                          }}
+                          className="p-1"
+                          title="Excluir chamado"
+                        >
                           <img src="/trash-icon.png" alt="Excluir chamado" className="w-6 h-6" />
                         </button>
                       )}
@@ -708,9 +726,13 @@ function App() {
                   {expandedTickets[ticket.id] && (
                     <div className="mt-4">
                       {!isAdmin && (
-                        <p className="text-gray-700 mb-1"><span className="font-semibold">Nome do Solicitante:</span> {ticket.nomeSolicitante}</p>
+                        <p className="text-gray-700 mb-1">
+                          <span className="font-semibold">Nome do Solicitante:</span> {ticket.nomeSolicitante}
+                        </p>
                       )}
-                      <p className="text-gray-700 mb-1"><span className="font-semibold">Cargo/Departamento:</span> {ticket.cargoDepartamento}</p>
+                      <p className="text-gray-700 mb-1">
+                        <span className="font-semibold">Cargo/Departamento:</span> {ticket.cargoDepartamento}
+                      </p>
                       <p className="text-gray-700 mb-1">
                         <span className="font-semibold">E-mail:</span> {ticket.emailSolicitante}
                         {isAdmin && (
@@ -723,7 +745,9 @@ function App() {
                           />
                         )}
                       </p>
-                      <p className="text-gray-700 mb-1 whitespace-pre-wrap"><span className="font-semibold">Descrição:</span> {ticket.descricaoProblema}</p>
+                      <p className="text-gray-700 mb-1 whitespace-pre-wrap">
+                        <span className="font-semibold">Descrição:</span> {ticket.descricaoProblema}
+                      </p>
                       <div className="mb-2">
                         <label className="font-semibold">Status:</label>{" "}
                         {isAdmin ? (
@@ -807,7 +831,6 @@ function App() {
                           >
                             Salvar
                           </button>
-                          {/* Exibe o botão "Reabrir chamado" para usuários se o ticket estiver concluído */}
                           {!isAdmin && ticket.status === "Concluído" && (
                             <button
                               onClick={() => handleReopenTicket(ticket.id)}
