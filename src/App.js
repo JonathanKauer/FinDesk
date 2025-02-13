@@ -97,7 +97,7 @@ const isValidDate = (dateStr) => {
 
 // Função que simula o envio de e-mail com um resumo da atualização
 const sendTicketUpdateEmail = async (ticket, updateDescription) => {
-  const subject = `Atualização no chamado ${ticket.id}`;
+  const subject = `Findesk: Atualização em chamado`;
   const body = `Resumo da atualização: ${updateDescription}\n` +
                `Ticket ID: ${ticket.id}\n` +
                `Solicitante: ${ticket.nomeSolicitante}\n` +
@@ -280,6 +280,8 @@ function App() {
     setPrioridade("");
     setNewTicketFiles([]);
     setShowNewTicketForm(false);
+
+    sendTicketUpdateEmail(newTicket,"Abertura de novo chamado");
   };
 
   // Função para reabrir um chamado (disponível para usuários)
