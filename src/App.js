@@ -102,7 +102,8 @@ const sendTicketUpdateEmail = async (ticket, updateDescription) => {
                `Ticket ID: ${ticket.id}\n` +
                `Solicitante: ${ticket.nomeSolicitante}\n` +
                `Status: ${ticket.status}\n` +
-               `Descrição: ${ticket.descricaoProblema}`;
+               `Descrição: ${ticket.descricaoProblema}\n` +
+               `Link de acesso: https://fin-desk.vercel.app/`;
   console.log(`Enviando email para ${ticket.emailSolicitante} e para financeiro@guiainvest.com.br`);
   console.log(`Assunto: ${subject}`);
   console.log(`Corpo: ${body}`);
