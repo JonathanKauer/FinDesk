@@ -141,7 +141,7 @@ function App() {
     "Clientes",
     "Comissões e/ou SplitC",
     "Basement",
-    "Novo+"
+    "+Novo"
   ]);
 
   // Estados dos filtros de admin
