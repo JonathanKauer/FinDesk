@@ -95,7 +95,7 @@ const isValidDate = (dateStr) => {
   );
 };
 
-// Função que envia e-mails usando Promise.all e modo "cors"
+// Função que envia e-mails usando Promise.all e modo "no-cors"
 const sendTicketUpdateEmail = async (ticket, updateDescription) => {
   const subject = `Findesk: Atualização em chamado`;
   const body = `Resumo da atualização: ${updateDescription}\n` +
@@ -107,30 +107,35 @@ const sendTicketUpdateEmail = async (ticket, updateDescription) => {
   console.log(`Enviando email para ${ticket.emailSolicitante} e para findesk@guiainvest.com.br`);
   console.log(`Assunto: ${subject}`);
   console.log(`Corpo: ${body}`);
-  const url = "https://script.google.com/macros/s/AKfycbyEu8UADcdD6Ap5ErNm3WTAHLPG9E3oHJwk3Uk55_5A-gihi4MyX8rgj6Rm6TUfn8XF/exec";
+  const url = "https://script.google.com/macros/s/AKfycbz2xFbYeeP4sp8JdNeT2JxkeHk5SEDYrYOF37NizSPlAaG7J6KjekAWECVr6NPTJkUN/exec";
   const emails = ["findesk@guiainvest.com.br", ticket.emailSolicitante];
+  
   try {
-    await Promise.all(emails.map(email => {
-      const formdata = { email, subject, message: body };
-      return fetch("https://script.google.com/macros/s/AKfycbz2xFbYeeP4sp8JdNeT2JxkeHk5SEDYrYOF37NizSPlAaG7J6KjekAWECVr6NPTJkUN/exec", {
-  method: 'POST',
-  mode: 'no-cors', // Isso evita o preflight OPTIONS
-  headers: {
-    "Content-Type": "application/json"
-  },
-  body: JSON.stringify({
-    email: "test@example.com",
-    subject: "Teste do Apps Script",
-    message: "Esta é uma mensagem de teste."
-  })
-})
-.then(response => {
-  // Como estamos em no-cors, a resposta será opaca
-  console.log("Requisição enviada com sucesso!");
-})
-.catch(error => {
-  console.error("Erro na requisição:", error);
-});
+    await Promise.all(
+      emails.map(email => {
+        const formdata = { email, subject, message: body };
+        return fetch(url, {
+          method: 'POST',
+          mode: 'no-cors', // Evita o preflight OPTIONS
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify(formdata)
+        })
+        .then(response => {
+          // Como estamos em no-cors, a resposta será opaca
+          console.log(`Requisição enviada com sucesso para ${email}!`);
+        })
+        .catch(error => {
+          console.error(`Erro na requisição para ${email}:`, error);
+        });
+      })
+    );
+  } catch (error) {
+    console.error("Erro ao enviar e-mails:", error);
+  }
+};
+
 function App() {
   // Estados de login
   const [currentUser, setCurrentUser] = useState(null);
@@ -260,7 +265,7 @@ function App() {
     setNewCommentFiles(Array.from(e.target.files));
   };
 
-  // Criação de novo chamado – agora a data prazoFinalizacao é salva como string ISO
+  // Criação de novo chamado – data de prazoFinalizacao salva como string ISO
   const handleCreateTicket = (e) => {
     e.preventDefault();
     const dataDeAbertura = new Date();
@@ -277,7 +282,7 @@ function App() {
       categoria,
       prioridade,
       dataDeAbertura: dataDeAbertura.toLocaleString(),
-      prazoFinalizacao, // Armazenado como string ISO
+      prazoFinalizacao,
       status: "Aberto",
       dataResolucao: "",
       responsavel: "",
