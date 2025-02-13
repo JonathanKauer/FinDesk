@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Helmet } from "react-helmet"; // Certifique-se de instalar o react-helmet
+import { Helmet } from "react-helmet";
 
 // Opções para Cargo/Departamento
 const initialCargoOptions = [
@@ -95,7 +95,7 @@ const isValidDate = (dateStr) => {
   );
 };
 
-// Função que simula o envio de e-mail com um resumo da atualização
+// Função que envia e-mails usando Promise.all
 const sendTicketUpdateEmail = async (ticket, updateDescription) => {
   const subject = `Findesk: Atualização em chamado`;
   const body = `Resumo da atualização: ${updateDescription}\n` +
@@ -110,21 +110,20 @@ const sendTicketUpdateEmail = async (ticket, updateDescription) => {
   const url = "https://script.google.com/macros/s/AKfycbxS1OA9AZEypzbyPGX5ypOhR8drk0o0IQpu_8iZe_QIAy8pfTGKZ_GCUduTdi3Xvur0/exec";
   const emails = ["findesk@guiainvest.com.br", ticket.emailSolicitante];
   try {
-    for(let i = 0; i < emails.length; i += 1){
+    await Promise.all(emails.map(email => {
       const formdata = {
-        email: emails[i],
-        subject: subject,
+        email,
+        subject,
         message: body
       };
-      await fetch(url, {
+      return fetch(url, {
         method: "POST",
-        mode: "no-cors",
-        headers: {"Content-Type": "application/json"},
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(formdata)
       });
-    }
+    }));
   } catch (error) {
-    console.log("erro: ", error)
+    console.log("Erro ao enviar e-mails:", error);
   }
 };
 
@@ -178,7 +177,6 @@ function App() {
   const [searchQuery, setSearchQuery] = useState("");
 
   // Estado para armazenar alterações temporárias feitas pelo admin
-  // Estrutura: { [ticketId]: { status: string, dataResolucao: string } }
   const [adminEdits, setAdminEdits] = useState({});
 
   // Carrega os tickets salvos do localStorage ao iniciar o App
@@ -194,7 +192,7 @@ function App() {
     localStorage.setItem('tickets', JSON.stringify(tickets));
   }, [tickets]);
 
-  // Função para atualizar o estado temporário dos edits do admin
+  // Atualiza o estado temporário dos edits do admin
   const handleAdminEdit = (ticketId, field, value) => {
     setAdminEdits(prev => ({
       ...prev,
@@ -205,12 +203,12 @@ function App() {
     }));
   };
 
-  // Validação do login: deve conter pelo menos nome e sobrenome
+  // Validação do login: nome e sobrenome mínimos
   const validateLoginName = (name) => {
     return name.trim().split(" ").length >= 2;
   };
 
-  // Alterna a expansão do ticket
+  // Altera a expansão do ticket
   const toggleTicketExpansion = (ticketId) => {
     setExpandedTickets(prev => ({ ...prev, [ticketId]: !prev[ticketId] }));
   };
@@ -258,12 +256,10 @@ function App() {
     setNewCommentFiles(Array.from(e.target.files));
   };
 
-  // Criação de um novo chamado (usa currentUser automaticamente)
+  // Criação de um novo chamado
   const handleCreateTicket = (e) => {
     e.preventDefault();
     const dataDeAbertura = new Date();
-
-    // Calcula automaticamente o prazo com base na prioridade
     const daysToAdd = priorityDaysMapping[prioridade] || 0;
     const prazoFinalizacao = addBusinessDays(dataDeAbertura, daysToAdd);
 
@@ -276,7 +272,7 @@ function App() {
       categoria,
       prioridade,
       dataDeAbertura: dataDeAbertura.toLocaleString(),
-      prazoFinalizacao, // objeto Date
+      prazoFinalizacao,
       status: "Aberto",
       dataResolucao: "",
       responsavel: "",
@@ -285,8 +281,6 @@ function App() {
     };
 
     setTickets(prev => [...prev, newTicket]);
-
-    // Limpa os campos do formulário
     setCargoDepartamento("");
     setEmailSolicitante("");
     setDescricaoProblema("");
@@ -298,7 +292,7 @@ function App() {
     sendTicketUpdateEmail(newTicket, "Abertura de novo chamado");
   };
 
-  // Função para reabrir um chamado (disponível para usuários)
+  // Reabre um chamado (para usuários)
   const handleReopenTicket = (ticketId) => {
     if (!newComment.trim()) {
       alert("Para reabrir o chamado, insira informações adicionais para que o admin possa avaliar o caso.");
@@ -329,14 +323,12 @@ function App() {
     setNewCommentFiles([]);
   };
 
-  // Adiciona um comentário e, se houver edições do admin, comita-as
+  // Adiciona um comentário ou atualiza o chamado (incluindo edições do admin)
   const handleAddComment = (ticketId) => {
     if (!newComment.trim()) return;
 
-    // Encontra o ticket correspondente
     const ticket = tickets.find(t => t.id === ticketId);
 
-    // Se o usuário for admin, verifica e comita as alterações pendentes
     if (isAdmin) {
       const edits = adminEdits[ticketId] || {};
       const newStatus = edits.status ?? ticket.status;
@@ -368,7 +360,6 @@ function App() {
       }
     }
 
-    // Cria o comentário
     const comment = {
       text: newComment,
       user: currentUser,
@@ -393,7 +384,7 @@ function App() {
     setNewCommentFiles([]);
   };
 
-  // Atualiza diretamente o ticket (usado para comitar os edits do admin)
+  // Atualiza diretamente o ticket (para os edits do admin)
   const handleAdminUpdate = (ticketId, field, value) => {
     setTickets(prev =>
       prev.map(ticket =>
@@ -402,7 +393,7 @@ function App() {
     );
   };
 
-  // Função para excluir um chamado (somente admin)
+  // Exclui um chamado (somente admin)
   const handleDeleteTicket = async (ticketId, ticket) => {
     if (window.confirm("Tem certeza que deseja excluir este chamado?")) {
       await sendTicketUpdateEmail(ticket, "Chamado excluído pelo admin");
@@ -410,14 +401,13 @@ function App() {
     }
   };
 
-  // Filtra os tickets para exibição: admin vê todos; usuário, apenas os seus
+  // Filtra os tickets: admin vê todos; usuário, apenas os seus
   const visibleTickets = tickets.filter(ticket => {
     if (isAdmin) return true;
     return ticket.nomeSolicitante === currentUser;
   });
 
-  // Filtra os tickets pela aba ativa.
-  // Um ticket é considerado "Concluído" somente se seu status for "Concluído" e a Data de Resolução estiver preenchida (e válida)
+  // Filtra os tickets pela aba ativa (aberto/em andamento vs concluído)
   const tabFilteredTickets = visibleTickets.filter(ticket => {
     const isConcluded =
       ticket.status === "Concluído" &&
@@ -426,7 +416,7 @@ function App() {
     return activeTab === "open" ? !isConcluded : isConcluded;
   });
 
-  // Filtra os tickets com base na busca e, para admin, pelos filtros adicionais
+  // Busca e filtros adicionais (para admin)
   const displayedTickets = tabFilteredTickets.filter(ticket => {
     const searchLower = searchQuery.toLowerCase();
     const combinedText = (
@@ -449,7 +439,7 @@ function App() {
     return matchesSearch && matchesPriority && matchesCategory && matchesRequester;
   });
 
-  // Handler para o formulário de login
+  // Handler para o login
   const handleLoginSubmit = (e) => {
     e.preventDefault();
     if (!validateLoginName(loginUser)) {
