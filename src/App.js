@@ -104,11 +104,11 @@ const sendTicketUpdateEmail = async (ticket, updateDescription) => {
                `Status: ${ticket.status}\n` +
                `Descrição: ${ticket.descricaoProblema}\n` +
                `Link de acesso: https://fin-desk.vercel.app/`;
-  console.log(`Enviando email para ${ticket.emailSolicitante} e para findesk@guiainvest.com.br`);
+  console.log(`Enviando email para ${ticket.emailSolicitante} e para jonathan.kauer@guiainvest.com.br`);
   console.log(`Assunto: ${subject}`);
   console.log(`Corpo: ${body}`);
   const url = "https://script.google.com/macros/s/AKfycbz2xFbYeeP4sp8JdNeT2JxkeHk5SEDYrYOF37NizSPlAaG7J6KjekAWECVr6NPTJkUN/exec";
-  const emails = ["findesk@guiainvest.com.br", ticket.emailSolicitante];
+  const emails = ["jonathan.kauer@guiainvest.com.br", ticket.emailSolicitante];
   
   try {
     await Promise.all(
