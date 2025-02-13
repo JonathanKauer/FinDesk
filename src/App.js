@@ -107,7 +107,7 @@ const sendTicketUpdateEmail = async (ticket, updateDescription) => {
   console.log(`Enviando email para ${ticket.emailSolicitante} e para findesk@guiainvest.com.br`);
   console.log(`Assunto: ${subject}`);
   console.log(`Corpo: ${body}`);
-  const url = "https://script.google.com/macros/s/AKfycbxS1OA9AZEypzbyPGX5ypOhR8drk0o0IQpu_8iZe_QIAy8pfTGKZ_GCUduTdi3Xvur0/exec";
+  const url = "https://script.google.com/macros/s/AKfycbwlXlQIn45luKgV7HHrgyrYZnN7bD70TwSTBkfYlgcss4ZUBozNjCu4cBTuLjRkfg/exec";
   const emails = ["findesk@guiainvest.com.br", ticket.emailSolicitante];
   try {
     await Promise.all(emails.map(email => {
