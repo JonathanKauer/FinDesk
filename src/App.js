@@ -1,6 +1,8 @@
+// src/App.js
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Helmet } from "react-helmet";
+import { fetchTickets, addTicket } from "./services/ticketService"; // Importa o serviço do Firestore
 
 // Opções para Cargo/Departamento
 const initialCargoOptions = [
@@ -168,13 +170,18 @@ function App() {
   // Estado para controlar a reabertura de ticket para usuários não-admin
   const [reopenTicket, setReopenTicket] = useState({});
 
+  // Carregar os tickets do Firestore ao montar o componente
   useEffect(() => {
-    const savedTickets = localStorage.getItem("tickets");
-    if (savedTickets) setTickets(JSON.parse(savedTickets));
+    const loadTickets = async () => {
+      try {
+        const fetchedTickets = await fetchTickets();
+        setTickets(fetchedTickets);
+      } catch (error) {
+        console.error("Erro ao carregar tickets:", error);
+      }
+    };
+    loadTickets();
   }, []);
-  useEffect(() => {
-    localStorage.setItem("tickets", JSON.stringify(tickets));
-  }, [tickets]);
 
   const validateFullName = (name) => {
     const parts = name.trim().split(" ");
@@ -227,7 +234,8 @@ function App() {
     }));
   };
 
-  const handleCreateTicket = (e) => {
+  // Função ajustada para criação de ticket usando Firestore
+  const handleCreateTicket = async (e) => {
     e.preventDefault();
     if (!newTicketNome.trim() || !validateFullName(newTicketNome)) {
       alert("Insira o Nome Completo do solicitante (nome e sobrenome com iniciais maiúsculas).");
@@ -255,17 +263,25 @@ function App() {
       sla: "",
       responsavel: "",
       comentarios: [],
-      attachments: newTicketFiles,
+      attachments: newTicketFiles
     };
-    setTickets(prev => [...prev, newTicket]);
-    setNewTicketNome("");
-    setCargoDepartamento("");
-    setDescricaoProblema("");
-    setCategoria("");
-    setPrioridade("");
-    setNewTicketFiles([]);
-    setShowNewTicketForm(false);
-    sendTicketUpdateEmail(newTicket, "Abertura de novo chamado");
+
+    try {
+      // Adiciona o ticket no Firestore
+      const ticketId = await addTicket(newTicket);
+      setTickets(prev => [...prev, { id: ticketId, ...newTicket }]);
+      // Limpa os campos do formulário
+      setNewTicketNome("");
+      setCargoDepartamento("");
+      setDescricaoProblema("");
+      setCategoria("");
+      setPrioridade("");
+      setNewTicketFiles([]);
+      setShowNewTicketForm(false);
+      sendTicketUpdateEmail(newTicket, "Abertura de novo chamado");
+    } catch (error) {
+      alert("Erro ao criar ticket");
+    }
   };
 
   const handleReopenTicket = (ticketId) => {
@@ -767,7 +783,6 @@ function App() {
                           </div>
                         </div>
                       ) : (
-                        // Para usuários não-admin, se o ticket estiver concluído, exibe botão para reabrir
                         !currentUser.isAdmin && (
                           <div className="mb-4">
                             {reopenTicket[ticket.id] ? (
