@@ -93,7 +93,7 @@ const computeSLA = (start, end) => {
     : `${hours} horas e ${minutes} minutos`;
 };
 
-// Função que envia e-mails usando Promise.all e modo "no-cors"
+// Função que envia e-mails (modo no-cors)
 const sendTicketUpdateEmail = async (ticket, updateDescription) => {
   const subject = `Findesk: Atualização em chamado`;
   const body = `Resumo da atualização: ${updateDescription}\n` +
@@ -103,8 +103,6 @@ const sendTicketUpdateEmail = async (ticket, updateDescription) => {
                `Descrição: ${ticket.descricaoProblema}\n` +
                `Link de acesso: https://fin-desk.vercel.app/`;
   console.log(`Enviando email para ${ticket.emailSolicitante} e para jonathan.kauer@guiainvest.com.br`);
-  console.log(`Assunto: ${subject}`);
-  console.log(`Corpo: ${body}`);
   const url = "https://script.google.com/macros/s/AKfycbz2xFbYeeP4sp8JdNeT2JxkeHk5SEDYrYOF37NizSPlAaG7J6KjekAWECVr6NPTJkUN/exec";
   const emails = ["jonathan.kauer@guiainvest.com.br", ticket.emailSolicitante];
   
@@ -115,17 +113,11 @@ const sendTicketUpdateEmail = async (ticket, updateDescription) => {
         return fetch(url, {
           method: 'POST',
           mode: 'no-cors',
-          headers: {
-            "Content-Type": "application/json"
-          },
+          headers: { "Content-Type": "application/json" },
           body: JSON.stringify(formdata)
         })
-        .then(response => {
-          console.log(`Requisição enviada com sucesso para ${email}!`);
-        })
-        .catch(error => {
-          console.error(`Erro na requisição para ${email}:`, error);
-        });
+        .then(response => console.log(`Requisição enviada com sucesso para ${email}!`))
+        .catch(error => console.error(`Erro na requisição para ${email}:`, error));
       })
     );
   } catch (error) {
@@ -134,17 +126,14 @@ const sendTicketUpdateEmail = async (ticket, updateDescription) => {
 };
 
 function App() {
-  // Estados de login (somente e-mail e senha)
-  // currentUser possui { email, isAdmin } para diferenciar os ambientes
+  // currentUser: { email, isAdmin } - isAdmin true apenas se login com senha admin.
   const [currentUser, setCurrentUser] = useState(null);
   const [loginEmail, setLoginEmail] = useState("");
   const [loginPassword, setLoginPassword] = useState("");
 
-  // Estados dos chamados e do formulário de novo chamado
   const [tickets, setTickets] = useState([]);
   const [showNewTicketForm, setShowNewTicketForm] = useState(false);
 
-  // Campos para criação de chamado
   const [newTicketNome, setNewTicketNome] = useState("");
   const [cargoDepartamento, setCargoDepartamento] = useState("");
   const [descricaoProblema, setDescricaoProblema] = useState("");
@@ -152,11 +141,9 @@ function App() {
   const [prioridade, setPrioridade] = useState("");
   const [newTicketFiles, setNewTicketFiles] = useState([]);
 
-  // Estados para comentários (por ticket)
   const [newComments, setNewComments] = useState({});
   const [newCommentFilesByTicket, setNewCommentFilesByTicket] = useState({});
 
-  // Opções de cargo e categoria
   const [cargoOptions, setCargoOptions] = useState(initialCargoOptions);
   const [categoryOptions, setCategoryOptions] = useState([
     "Clientes",
@@ -165,28 +152,23 @@ function App() {
     "+Novo"
   ]);
 
-  // Filtros para admin (aparecem apenas se currentUser.isAdmin for true)
+  // Os filtros só aparecem para usuários admin (login com isAdmin true)
   const [adminFilterPriority, setAdminFilterPriority] = useState("");
   const [adminFilterCategory, setAdminFilterCategory] = useState("");
   const [adminFilterAtendente, setAdminFilterAtendente] = useState("");
 
-  // Controle de expansão dos chamados e abas
   const [expandedTickets, setExpandedTickets] = useState({});
   const [activeTab, setActiveTab] = useState("open");
   const [adminEdits, setAdminEdits] = useState({});
 
-  // Carregar e salvar tickets no localStorage
   useEffect(() => {
     const savedTickets = localStorage.getItem('tickets');
-    if (savedTickets) {
-      setTickets(JSON.parse(savedTickets));
-    }
+    if (savedTickets) setTickets(JSON.parse(savedTickets));
   }, []);
   useEffect(() => {
     localStorage.setItem('tickets', JSON.stringify(tickets));
   }, [tickets]);
 
-  // Validação de nome completo
   const validateFullName = (name) => {
     const parts = name.trim().split(" ");
     return parts.length >= 2 && parts.every(part => part[0] === part[0].toUpperCase());
@@ -196,7 +178,6 @@ function App() {
     setExpandedTickets(prev => ({ ...prev, [ticketId]: !prev[ticketId] }));
   };
 
-  // Handlers para alterações
   const handleCargoChange = (e) => {
     const value = e.target.value;
     if (value === "+Novo") {
@@ -204,12 +185,8 @@ function App() {
       if (novoCargo) {
         setCargoOptions([...cargoOptions.slice(0, cargoOptions.length - 1), novoCargo, "+Novo"]);
         setCargoDepartamento(novoCargo);
-      } else {
-        setCargoDepartamento("");
-      }
-    } else {
-      setCargoDepartamento(value);
-    }
+      } else setCargoDepartamento("");
+    } else setCargoDepartamento(value);
   };
 
   const handleCategoryChange = (e) => {
@@ -220,12 +197,8 @@ function App() {
         const optionsWithoutNovo = categoryOptions.filter(opt => opt !== "+Novo");
         setCategoryOptions([...optionsWithoutNovo, novaCategoria, "+Novo"]);
         setCategoria(novaCategoria);
-      } else {
-        setCategoria("");
-      }
-    } else {
-      setCategoria(value);
-    }
+      } else setCategoria("");
+    } else setCategoria(value);
   };
 
   const handleTicketFileChange = (e) => {
@@ -239,7 +212,6 @@ function App() {
     }));
   };
 
-  // Criação de chamado
   const handleCreateTicket = (e) => {
     e.preventDefault();
     if (!newTicketNome.trim() || !validateFullName(newTicketNome)) {
@@ -278,7 +250,6 @@ function App() {
     sendTicketUpdateEmail(newTicket, "Abertura de novo chamado");
   };
 
-  // Reabertura de chamado (usuário)
   const handleReopenTicket = (ticketId) => {
     const commentText = newComments[ticketId];
     if (!commentText || !commentText.trim()) {
@@ -311,7 +282,6 @@ function App() {
     setNewCommentFilesByTicket(prev => ({ ...prev, [ticketId]: [] }));
   };
 
-  // Adição de comentário ou atualização do chamado
   const handleAddComment = (ticketId) => {
     const commentText = newComments[ticketId];
     const ticket = tickets.find(t => t.id === ticketId);
@@ -387,7 +357,6 @@ function App() {
     setNewCommentFilesByTicket(prev => ({ ...prev, [ticketId]: [] }));
   };
 
-  // Atualiza chamado (admin)
   const handleAdminEdit = (ticketId, field, value) => {
     if (field === 'status') {
       setAdminEdits(prev => ({
@@ -409,7 +378,6 @@ function App() {
     }
   };
 
-  // Exclui chamado (admin)
   const handleDeleteTicket = async (ticketId, ticket) => {
     if (window.confirm("Tem certeza que deseja excluir este chamado?")) {
       await sendTicketUpdateEmail(ticket, "Chamado excluído pelo admin");
@@ -417,13 +385,12 @@ function App() {
     }
   };
 
-  // Filtra tickets
   const visibleTickets = !currentUser 
     ? [] 
     : tickets.filter(ticket => {
         return ticket.emailSolicitante === currentUser.email ||
                ["jonathan.kauer@guiainvest.com.br", "nayla.martins@guiainvest.com.br"]
-                .includes(currentUser.email.toLowerCase());
+                 .includes(currentUser.email.toLowerCase());
       });
   const tabFilteredTickets = visibleTickets.filter(ticket => {
     return activeTab === "open" 
@@ -431,7 +398,6 @@ function App() {
       : ticket.status === "Concluído";
   });
 
-  // Handler para login com duas senhas para admin
   const handleLoginSubmit = (e) => {
     e.preventDefault();
     if (!loginEmail.trim() || !loginPassword.trim()) {
@@ -457,7 +423,7 @@ function App() {
           localStorage.setItem("users", JSON.stringify(users));
           alert("Senha cadastrada com sucesso!");
         }
-        // Para admin que logam como usuário, isAdmin será false
+        // Para admin que logam como usuário, isAdmin é false
         setCurrentUser({ email: loginEmail, isAdmin: false });
         setLoginEmail("");
         setLoginPassword("");
@@ -603,7 +569,7 @@ function App() {
                 Concluídos
               </button>
             </div>
-            {/* Os filtros só serão exibidos se o usuário for admin */}
+            {/* Os filtros serão exibidos somente se currentUser.isAdmin for true */}
             {currentUser.isAdmin && (
               <div className="flex flex-col sm:flex-row items-center gap-2">
                 <select value={adminFilterPriority} onChange={e => setAdminFilterPriority(e.target.value)} className="border rounded px-2 py-1">
@@ -728,7 +694,7 @@ function App() {
                   <div className="flex justify-between items-center">
                     <div>
                       <h2 className="text-xl font-bold">
-                        {(["jonathan.kauer@guiainvest.com.br", "nayla.martins@guiainvest.com.br"].includes(currentUser.email.toLowerCase()))
+                        {currentUser.isAdmin
                           ? `Solicitante: ${ticket.nomeSolicitante}`
                           : `ID: ${ticket.id}`
                         }
@@ -764,7 +730,7 @@ function App() {
                       >
                         {expandedTickets[ticket.id] ? "Ocultar" : "Ver Detalhes"}
                       </button>
-                      {(["jonathan.kauer@guiainvest.com.br", "nayla.martins@guiainvest.com.br"].includes(currentUser.email.toLowerCase())) && (
+                      {currentUser.isAdmin && (
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
@@ -780,7 +746,7 @@ function App() {
                   </div>
                   {expandedTickets[ticket.id] && (
                     <div className="mt-4">
-                      {!(["jonathan.kauer@guiainvest.com.br", "nayla.martins@guiainvest.com.br"].includes(currentUser.email.toLowerCase())) && (
+                      {!currentUser.isAdmin && (
                         <p className="text-gray-700 mb-1">
                           <span className="font-semibold">Nome do Solicitante:</span> {ticket.nomeSolicitante}
                         </p>
@@ -791,27 +757,25 @@ function App() {
                       <p className="text-gray-700 mb-1 whitespace-pre-wrap">
                         <span className="font-semibold">Descrição:</span> {ticket.descricaoProblema}
                       </p>
-                      <div className="mb-2">
-                        <label className="font-semibold">Status:</label>{" "}
-                        {(["jonathan.kauer@guiainvest.com.br", "nayla.martins@guiainvest.com.br"].includes(currentUser.email.toLowerCase()))
-                          ? (ticket.status === "Concluído" ? (
-                              <span className="ml-1">{ticket.status}</span>
-                            ) : (
-                              <select
-                                value={adminEdits[ticket.id]?.status ?? ticket.status}
-                                onChange={e => handleAdminEdit(ticket.id, 'status', e.target.value)}
-                                className="border rounded px-2 py-1 ml-1"
-                              >
-                                {statusOptions.map((option, idx) => (
-                                  <option key={idx} value={option}>{option}</option>
-                                ))}
-                              </select>
-                            ))
-                          : (
-                              <span className="ml-1">{ticket.status}</span>
-                            )}
-                      </div>
-                      {(["jonathan.kauer@guiainvest.com.br", "nayla.martins@guiainvest.com.br"].includes(currentUser.email.toLowerCase())) && (
+                      {currentUser.isAdmin && (
+                        <div className="mb-2">
+                          <label className="font-semibold">Status:</label>{" "}
+                          {ticket.status === "Concluído" ? (
+                            <span className="ml-1">{ticket.status}</span>
+                          ) : (
+                            <select
+                              value={adminEdits[ticket.id]?.status ?? ticket.status}
+                              onChange={e => handleAdminEdit(ticket.id, 'status', e.target.value)}
+                              className="border rounded px-2 py-1 ml-1"
+                            >
+                              {statusOptions.map((option, idx) => (
+                                <option key={idx} value={option}>{option}</option>
+                              ))}
+                            </select>
+                          )}
+                        </div>
+                      )}
+                      {currentUser.isAdmin && (
                         <div className="mb-2">
                           <label className="font-semibold">Atendente:</label>{" "}
                           {ticket.status === "Concluído" ? (
