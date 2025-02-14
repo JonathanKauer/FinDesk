@@ -93,7 +93,7 @@ const computeSLA = (start, end) => {
     : `${hours} horas e ${minutes} minutos`;
 };
 
-// Função que envia e-mails (modo no-cors)
+// Função que envia e-mails usando Promise.all e modo "no-cors"
 const sendTicketUpdateEmail = async (ticket, updateDescription) => {
   const subject = `Findesk: Atualização em chamado`;
   const body = `Resumo da atualização: ${updateDescription}\n` +
@@ -126,7 +126,7 @@ const sendTicketUpdateEmail = async (ticket, updateDescription) => {
 };
 
 function App() {
-  // currentUser: { email, isAdmin } - isAdmin true apenas se login com senha admin.
+  // currentUser: { email, isAdmin }
   const [currentUser, setCurrentUser] = useState(null);
   const [loginEmail, setLoginEmail] = useState("");
   const [loginPassword, setLoginPassword] = useState("");
@@ -152,7 +152,7 @@ function App() {
     "+Novo"
   ]);
 
-  // Os filtros só aparecem para usuários admin (login com isAdmin true)
+  // Filtros só para admin quando isAdmin é true
   const [adminFilterPriority, setAdminFilterPriority] = useState("");
   const [adminFilterCategory, setAdminFilterCategory] = useState("");
   const [adminFilterAtendente, setAdminFilterAtendente] = useState("");
@@ -283,13 +283,18 @@ function App() {
   };
 
   const handleAddComment = (ticketId) => {
+    console.log("handleAddComment called for ticket:", ticketId);
     const commentText = newComments[ticketId];
+    console.log("Comment text:", commentText);
     const ticket = tickets.find(t => t.id === ticketId);
-    if (isAdmin) {
+    console.log("Ticket found:", ticket);
+    if (currentUser.isAdmin) {
+      console.log("User is admin");
       const edits = adminEdits[ticketId] || {};
       const newStatus = edits.status ?? ticket.status;
+      console.log("New status:", newStatus);
       if (newStatus === "Concluído" && (!commentText || !commentText.trim())) {
-        alert("Ao concluir o chamado, adicione um comentário.");
+        alert("Ao concluir o chamado, é necessário adicionar um comentário.");
         return;
       }
       if (edits.status || edits.responsavel) {
@@ -318,6 +323,7 @@ function App() {
                 };
                 updatedTicket.comentarios = [...ticketItem.comentarios, adminComment];
               }
+              console.log("Updated ticket (admin):", updatedTicket);
               sendTicketUpdateEmail(updatedTicket, `Atualização pelo admin: Status alterado para ${newStatus}`);
               return updatedTicket;
             }
@@ -333,28 +339,31 @@ function App() {
         setNewCommentFilesByTicket(prev => ({ ...prev, [ticketId]: [] }));
         return;
       }
+    } else {
+      console.log("User is not admin");
+      const comment = {
+        text: commentText,
+        user: ticket.nomeSolicitante,
+        timestamp: new Date().toLocaleString(),
+        attachments: newCommentFilesByTicket[ticketId] || [],
+      };
+      setTickets(prev =>
+        prev.map(ticketItem => {
+          if (ticketItem.id === ticketId) {
+            const updatedTicket = {
+              ...ticketItem,
+              comentarios: [...ticketItem.comentarios, comment],
+            };
+            console.log("Updated ticket (user):", updatedTicket);
+            sendTicketUpdateEmail(updatedTicket, `Novo comentário adicionado: ${comment.text}`);
+            return updatedTicket;
+          }
+          return ticketItem;
+        })
+      );
+      setNewComments(prev => ({ ...prev, [ticketId]: "" }));
+      setNewCommentFilesByTicket(prev => ({ ...prev, [ticketId]: [] }));
     }
-    const comment = {
-      text: commentText,
-      user: ticket.nomeSolicitante,
-      timestamp: new Date().toLocaleString(),
-      attachments: newCommentFilesByTicket[ticketId] || [],
-    };
-    setTickets(prev =>
-      prev.map(ticketItem => {
-        if (ticketItem.id === ticketId) {
-          const updatedTicket = {
-            ...ticketItem,
-            comentarios: [...ticketItem.comentarios, comment],
-          };
-          sendTicketUpdateEmail(updatedTicket, `Novo comentário adicionado: ${comment.text}`);
-          return updatedTicket;
-        }
-        return ticketItem;
-      })
-    );
-    setNewComments(prev => ({ ...prev, [ticketId]: "" }));
-    setNewCommentFilesByTicket(prev => ({ ...prev, [ticketId]: [] }));
   };
 
   const handleAdminEdit = (ticketId, field, value) => {
@@ -423,7 +432,6 @@ function App() {
           localStorage.setItem("users", JSON.stringify(users));
           alert("Senha cadastrada com sucesso!");
         }
-        // Para admin que logam como usuário, isAdmin é false
         setCurrentUser({ email: loginEmail, isAdmin: false });
         setLoginEmail("");
         setLoginPassword("");
@@ -451,7 +459,6 @@ function App() {
     setCurrentUser(null);
   };
 
-  // Handler para redefinir senha
   const handleResetPassword = () => {
     if (!loginEmail.trim()) {
       alert("Por favor, insira seu e-mail para redefinir a senha.");
@@ -569,7 +576,6 @@ function App() {
                 Concluídos
               </button>
             </div>
-            {/* Os filtros serão exibidos somente se currentUser.isAdmin for true */}
             {currentUser.isAdmin && (
               <div className="flex flex-col sm:flex-row items-center gap-2">
                 <select value={adminFilterPriority} onChange={e => setAdminFilterPriority(e.target.value)} className="border rounded px-2 py-1">
