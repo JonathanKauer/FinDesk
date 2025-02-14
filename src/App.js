@@ -57,14 +57,20 @@ function generateTicketId() {
   return result;
 }
 
-// Renderiza anexos como links para download/visualização
+// Função auxiliar para renderizar anexos como links para download/visualização
 const renderAttachments = (files) => (
   <ul className="list-disc list-inside">
     {files.map((file, idx) => {
       const fileURL = URL.createObjectURL(file);
       return (
         <li key={idx}>
-          <a href={fileURL} download target="_blank" rel="noopener noreferrer" className="text-blue-600 underline">
+          <a
+            href={fileURL}
+            download
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-blue-600 underline"
+          >
             {file.name}
           </a>
         </li>
@@ -73,7 +79,7 @@ const renderAttachments = (files) => (
   </ul>
 );
 
-// Calcula o SLA (diferença entre duas datas) de forma adequada
+// Função para calcular o SLA (diferença entre duas datas) de forma adequada
 const computeSLA = (start, end) => {
   const diffMs = end - start;
   const diffMinutes = Math.floor(diffMs / 60000);
@@ -85,7 +91,7 @@ const computeSLA = (start, end) => {
   return minutes === 0 ? `${hours} horas` : `${hours} horas e ${minutes} minutos`;
 };
 
-// Envia e-mails (modo no-cors)
+// Função que envia e-mails (modo "no-cors")
 const sendTicketUpdateEmail = async (ticket, updateDescription) => {
   const subject = `Findesk: Atualização em chamado`;
   const body =
@@ -96,7 +102,8 @@ const sendTicketUpdateEmail = async (ticket, updateDescription) => {
     `Descrição: ${ticket.descricaoProblema}\n` +
     `Link de acesso: https://fin-desk.vercel.app/`;
   console.log(`Enviando email para ${ticket.emailSolicitante} e para jonathan.kauer@guiainvest.com.br`);
-  const url = "https://script.google.com/macros/s/AKfycbz2xFbYeeP4sp8JdNeT2JxkeHk5SEDYrYOF37NizSPlAaG7J6KjekAWECVr6NPTJkUN/exec";
+  const url =
+    "https://script.google.com/macros/s/AKfycbz2xFbYeeP4sp8JdNeT2JxkeHk5SEDYrYOF37NizSPlAaG7J6KjekAWECVr6NPTJkUN/exec";
   const emails = ["jonathan.kauer@guiainvest.com.br", ticket.emailSolicitante];
   
   try {
@@ -127,7 +134,7 @@ function App() {
   const [tickets, setTickets] = useState([]);
   const [showNewTicketForm, setShowNewTicketForm] = useState(false);
 
-  // Armazena data de abertura em dois formatos: ISO (para cálculos) e display
+  // Armazenamento de data de abertura em dois formatos: ISO e display
   const [newTicketNome, setNewTicketNome] = useState("");
   const [cargoDepartamento, setCargoDepartamento] = useState("");
   const [descricaoProblema, setDescricaoProblema] = useState("");
@@ -146,7 +153,7 @@ function App() {
     "+Novo"
   ]);
 
-  // Filtros visíveis somente para admin (currentUser.isAdmin true)
+  // Filtros (apenas para admins)
   const [adminFilterPriority, setAdminFilterPriority] = useState("");
   const [adminFilterCategory, setAdminFilterCategory] = useState("");
   const [adminFilterAtendente, setAdminFilterAtendente] = useState("");
@@ -155,7 +162,10 @@ function App() {
   const [activeTab, setActiveTab] = useState("open");
   const [adminEdits, setAdminEdits] = useState({});
 
-  // Estado para controlar se o usuário deseja reabrir um ticket (para usuários não admin)
+  // Novo estado para avisos de comentário
+  const [commentWarnings, setCommentWarnings] = useState({});
+
+  // Estado para controlar a reabertura de ticket para usuários não-admin
   const [reopenTicket, setReopenTicket] = useState({});
 
   useEffect(() => {
@@ -182,8 +192,12 @@ function App() {
       if (novoCargo) {
         setCargoOptions([...cargoOptions.slice(0, cargoOptions.length - 1), novoCargo, "+Novo"]);
         setCargoDepartamento(novoCargo);
-      } else setCargoDepartamento("");
-    } else setCargoDepartamento(value);
+      } else {
+        setCargoDepartamento("");
+      }
+    } else {
+      setCargoDepartamento(value);
+    }
   };
 
   const handleCategoryChange = (e) => {
@@ -194,8 +208,12 @@ function App() {
         const optionsWithoutNovo = categoryOptions.filter(opt => opt !== "+Novo");
         setCategoryOptions([...optionsWithoutNovo, novaCategoria, "+Novo"]);
         setCategoria(novaCategoria);
-      } else setCategoria("");
-    } else setCategoria(value);
+      } else {
+        setCategoria("");
+      }
+    } else {
+      setCategoria(value);
+    }
   };
 
   const handleTicketFileChange = (e) => {
@@ -278,13 +296,12 @@ function App() {
         return ticket;
       })
     );
-    // Limpa o campo e oculta a área de reabertura
     setNewComments(prev => ({ ...prev, [ticketId]: "" }));
     setNewCommentFilesByTicket(prev => ({ ...prev, [ticketId]: [] }));
     setReopenTicket(prev => ({ ...prev, [ticketId]: false }));
   };
 
-  // Função handleAddComment para adicionar comentário em tickets não concluídos
+  // Refatoração da função handleAddComment com aviso visual para admin
   const handleAddComment = (ticketId) => {
     console.log("handleAddComment called for ticket:", ticketId);
     const commentText = newComments[ticketId];
@@ -297,7 +314,19 @@ function App() {
       console.log("Chamado não encontrado.");
       return;
     }
-    // Se o usuário for admin e houver edições definidas, atualiza o ticket
+    // Se o usuário for admin e estiver concluindo o ticket, exige comentário
+    if (currentUser.isAdmin && adminEdits[ticketId]?.status === "Concluído" && (!commentText || commentText.trim() === "")) {
+      setCommentWarnings(prev => ({ ...prev, [ticketId]: "É necessário adicionar um comentário antes de concluir o chamado." }));
+      return;
+    } else {
+      // Remove aviso se existir
+      setCommentWarnings(prev => {
+        const newWarnings = { ...prev };
+        delete newWarnings[ticketId];
+        return newWarnings;
+      });
+    }
+    // Se o usuário for admin e houver edições, atualiza ticket
     let updatedTicket = { ...ticket };
     if (currentUser.isAdmin && adminEdits[ticketId]) {
       if (adminEdits[ticketId].status) {
@@ -311,7 +340,7 @@ function App() {
         updatedTicket.responsavel = adminEdits[ticketId].responsavel;
       }
     }
-    // Cria o comentário
+    // Cria o comentário (para admin, prefixa "Admin:"; para usuários, usa o nome do solicitante)
     const comment = {
       text: commentText,
       user: currentUser.isAdmin ? ("Admin: " + (ticket.responsavel || "")) : ticket.nomeSolicitante,
@@ -361,13 +390,23 @@ function App() {
     }
   };
 
-  const visibleTickets = !currentUser
-    ? []
-    : tickets.filter(ticket => {
-        return ticket.emailSolicitante === currentUser.email ||
-          ["jonathan.kauer@guiainvest.com.br", "nayla.martins@guiainvest.com.br"].includes(currentUser.email.toLowerCase());
-      });
-  const tabFilteredTickets = visibleTickets.filter(ticket => {
+  // Filtragem de tickets: para admins, aplica os filtros; para usuários, filtra pelo e-mail
+  let filteredTickets = tickets;
+  if (currentUser && currentUser.isAdmin) {
+    if (adminFilterPriority) {
+      filteredTickets = filteredTickets.filter(ticket => ticket.prioridade === adminFilterPriority);
+    }
+    if (adminFilterCategory) {
+      filteredTickets = filteredTickets.filter(ticket => ticket.categoria === adminFilterCategory);
+    }
+    if (adminFilterAtendente) {
+      filteredTickets = filteredTickets.filter(ticket => ticket.responsavel === adminFilterAtendente);
+    }
+  } else if (currentUser) {
+    filteredTickets = tickets.filter(ticket => ticket.emailSolicitante === currentUser.email);
+  }
+
+  const tabFilteredTickets = filteredTickets.filter(ticket => {
     return activeTab === "open" ? ticket.status !== "Concluído" : ticket.status === "Concluído";
   });
 
@@ -396,7 +435,7 @@ function App() {
           localStorage.setItem("users", JSON.stringify(users));
           alert("Senha cadastrada com sucesso!");
         }
-        // Admin logado como usuário terá isAdmin: false
+        // Admin logado como usuário
         setCurrentUser({ email: loginEmail, isAdmin: false });
         setLoginEmail("");
         setLoginPassword("");
@@ -503,7 +542,7 @@ function App() {
           {/* Menus de Chamados Centralizados */}
           <div className="flex flex-col items-center mb-4">
             <div className="flex gap-4 mb-4">
-              <button onClick={() => setActiveTab("open")} className="px-3 py-1 rounded" style={ activeTab === "open" ? { backgroundColor: "#0E1428", color: "white" } : { backgroundColor: "#f2f2f2", color: "#0E1428", border: "1px solid #0E1428" }}>
+              <button onClick={() => setActiveTab("open")} className="px-3 py-1 rounded" style={ activeTab === "open" ? { backgroundColor: "#0E1428", color: "white" } : { backgroundColor: "#f2f2f2", color: "#0E1428", border: "1px solid #0E1428" } }>
                 Abertos e em andamento
               </button>
               <button onClick={() => setActiveTab("closed")} className="px-3 py-1 rounded" style={ activeTab === "closed" ? { backgroundColor: "#0E1428", color: "white" } : { backgroundColor: "#f2f2f2", color: "#0E1428", border: "1px solid #0E1428" } }>
@@ -600,14 +639,7 @@ function App() {
             {tabFilteredTickets.map((ticket) => {
               const isExpired = ticket.status !== "Concluído" && new Date() > new Date(ticket.prazoFinalizacao);
               return (
-                <motion.div
-                  key={ticket.id}
-                  className="relative shadow p-4 rounded-2xl"
-                  style={{ backgroundColor: isExpired ? "#ffe6e6" : "white" }}
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.3 }}
-                >
+                <motion.div key={ticket.id} className="relative shadow p-4 rounded-2xl" style={{ backgroundColor: isExpired ? "#ffe6e6" : "white" }} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}>
                   <div className="flex justify-between items-center">
                     <div>
                       <h2 className="text-xl font-bold">
@@ -722,6 +754,11 @@ function App() {
                       {ticket.status !== "Concluído" ? (
                         <div className="mb-4">
                           <textarea value={newComments[ticket.id] || ""} onChange={(e) => setNewComments((prev) => ({ ...prev, [ticket.id]: e.target.value }))} placeholder="Digite um comentário ou atualização..." className="w-full border rounded-lg p-2 mb-2 whitespace-pre-wrap" rows="3" />
+                          {commentWarnings[ticket.id] && (
+                            <div className="text-red-600 text-sm mb-2">
+                              {commentWarnings[ticket.id]}
+                            </div>
+                          )}
                           <input type="file" multiple onChange={(e) => handleCommentFileChange(ticket.id, e)} className="w-full mb-2" />
                           <div className="flex gap-2">
                             <button onClick={() => handleAddComment(ticket.id)} className="px-3 py-1 rounded-lg shadow" style={{ backgroundColor: "#0E1428", color: "white" }}>
