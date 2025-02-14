@@ -135,8 +135,8 @@ const sendTicketUpdateEmail = async (ticket, updateDescription) => {
 
 function App() {
   // Estados de login (somente e-mail e senha)
-  // Agora, currentUser possui também uma flag "isAdmin" para diferenciar os ambientes.
-  const [currentUser, setCurrentUser] = useState(null); // objeto: { email, isAdmin }
+  // currentUser possui { email, isAdmin } para diferenciar os ambientes
+  const [currentUser, setCurrentUser] = useState(null);
   const [loginEmail, setLoginEmail] = useState("");
   const [loginPassword, setLoginPassword] = useState("");
 
@@ -145,21 +145,19 @@ function App() {
   const [showNewTicketForm, setShowNewTicketForm] = useState(false);
 
   // Campos para criação de chamado
-  const [newTicketNome, setNewTicketNome] = useState(""); // Nome completo do solicitante
+  const [newTicketNome, setNewTicketNome] = useState("");
   const [cargoDepartamento, setCargoDepartamento] = useState("");
   const [descricaoProblema, setDescricaoProblema] = useState("");
   const [categoria, setCategoria] = useState("");
   const [prioridade, setPrioridade] = useState("");
   const [newTicketFiles, setNewTicketFiles] = useState([]);
 
-  // Estados para comentários por chamado (armazenados por ticket id)
+  // Estados para comentários (por ticket)
   const [newComments, setNewComments] = useState({});
   const [newCommentFilesByTicket, setNewCommentFilesByTicket] = useState({});
 
-  // Gerenciamento das opções de cargo (permitindo "+Novo")
+  // Opções de cargo e categoria
   const [cargoOptions, setCargoOptions] = useState(initialCargoOptions);
-
-  // Gerenciamento das opções de categoria (com opção "+Novo")
   const [categoryOptions, setCategoryOptions] = useState([
     "Clientes",
     "Comissões e/ou SplitC",
@@ -167,46 +165,38 @@ function App() {
     "+Novo"
   ]);
 
-  // Estados dos filtros de admin
+  // Filtros para admin (aparecem apenas se currentUser.isAdmin for true)
   const [adminFilterPriority, setAdminFilterPriority] = useState("");
   const [adminFilterCategory, setAdminFilterCategory] = useState("");
   const [adminFilterAtendente, setAdminFilterAtendente] = useState("");
 
-  // Controle de expansão dos chamados
+  // Controle de expansão dos chamados e abas
   const [expandedTickets, setExpandedTickets] = useState({});
-
-  // Estado para as abas: "open" e "closed"
   const [activeTab, setActiveTab] = useState("open");
-
-  // Alterações temporárias do admin
   const [adminEdits, setAdminEdits] = useState({});
 
-  // Carrega os tickets do localStorage
+  // Carregar e salvar tickets no localStorage
   useEffect(() => {
     const savedTickets = localStorage.getItem('tickets');
     if (savedTickets) {
       setTickets(JSON.parse(savedTickets));
     }
   }, []);
-
-  // Salva os tickets no localStorage
   useEffect(() => {
     localStorage.setItem('tickets', JSON.stringify(tickets));
   }, [tickets]);
 
-  // Validação: Nome completo deve ter ao menos nome e sobrenome com iniciais maiúsculas
+  // Validação de nome completo
   const validateFullName = (name) => {
     const parts = name.trim().split(" ");
-    if (parts.length < 2) return false;
-    return parts.every(part => part[0] === part[0].toUpperCase());
+    return parts.length >= 2 && parts.every(part => part[0] === part[0].toUpperCase());
   };
 
-  // Alterna a expansão do ticket
   const toggleTicketExpansion = (ticketId) => {
     setExpandedTickets(prev => ({ ...prev, [ticketId]: !prev[ticketId] }));
   };
 
-  // Handler para cargo/departamento
+  // Handlers para alterações
   const handleCargoChange = (e) => {
     const value = e.target.value;
     if (value === "+Novo") {
@@ -222,7 +212,6 @@ function App() {
     }
   };
 
-  // Handler para categoria
   const handleCategoryChange = (e) => {
     const value = e.target.value;
     if (value === "+Novo") {
@@ -239,12 +228,10 @@ function App() {
     }
   };
 
-  // Handler para anexar documentos no chamado
   const handleTicketFileChange = (e) => {
     setNewTicketFiles(Array.from(e.target.files));
   };
 
-  // Handler para anexar documentos nos comentários (por ticket)
   const handleCommentFileChange = (ticketId, e) => {
     setNewCommentFilesByTicket(prev => ({
       ...prev,
@@ -252,18 +239,17 @@ function App() {
     }));
   };
 
-  // Criação de novo chamado – a data de abertura é salva com toLocaleString
+  // Criação de chamado
   const handleCreateTicket = (e) => {
     e.preventDefault();
     if (!newTicketNome.trim() || !validateFullName(newTicketNome)) {
-      alert("Por favor, insira o Nome Completo do solicitante (nome e sobrenome com iniciais maiúsculas).");
+      alert("Insira o Nome Completo do solicitante (nome e sobrenome com iniciais maiúsculas).");
       return;
     }
     const dataDeAbertura = new Date();
     const daysToAdd = priorityDaysMapping[prioridade] || 0;
     const prazoFinalizacaoDate = addBusinessDays(dataDeAbertura, daysToAdd);
     const prazoFinalizacao = prazoFinalizacaoDate.toISOString();
-
     const newTicket = {
       id: generateTicketId(),
       nomeSolicitante: newTicketNome,
@@ -281,7 +267,6 @@ function App() {
       comentarios: [],
       attachments: newTicketFiles,
     };
-
     setTickets(prev => [...prev, newTicket]);
     setNewTicketNome("");
     setCargoDepartamento("");
@@ -290,15 +275,14 @@ function App() {
     setPrioridade("");
     setNewTicketFiles([]);
     setShowNewTicketForm(false);
-
     sendTicketUpdateEmail(newTicket, "Abertura de novo chamado");
   };
 
-  // Reabre chamado (usuário)
+  // Reabertura de chamado (usuário)
   const handleReopenTicket = (ticketId) => {
     const commentText = newComments[ticketId];
     if (!commentText || !commentText.trim()) {
-      alert("Para reabrir o chamado, insira informações adicionais para que o admin possa avaliar o caso.");
+      alert("Insira informações adicionais para reabrir o chamado.");
       return;
     }
     setTickets(prev =>
@@ -327,16 +311,15 @@ function App() {
     setNewCommentFilesByTicket(prev => ({ ...prev, [ticketId]: [] }));
   };
 
-  // Adiciona comentário ou atualiza chamado (incluindo edições do admin)
+  // Adição de comentário ou atualização do chamado
   const handleAddComment = (ticketId) => {
     const commentText = newComments[ticketId];
     const ticket = tickets.find(t => t.id === ticketId);
-
     if (isAdmin) {
       const edits = adminEdits[ticketId] || {};
       const newStatus = edits.status ?? ticket.status;
       if (newStatus === "Concluído" && (!commentText || !commentText.trim())) {
-        alert("Ao concluir o chamado, é necessário adicionar um comentário.");
+        alert("Ao concluir o chamado, adicione um comentário.");
         return;
       }
       if (edits.status || edits.responsavel) {
@@ -381,14 +364,12 @@ function App() {
         return;
       }
     }
-
     const comment = {
       text: commentText,
       user: ticket.nomeSolicitante,
       timestamp: new Date().toLocaleString(),
       attachments: newCommentFilesByTicket[ticketId] || [],
     };
-
     setTickets(prev =>
       prev.map(ticketItem => {
         if (ticketItem.id === ticketId) {
@@ -406,7 +387,7 @@ function App() {
     setNewCommentFilesByTicket(prev => ({ ...prev, [ticketId]: [] }));
   };
 
-  // Atualiza chamado diretamente (para os edits do admin)
+  // Atualiza chamado (admin)
   const handleAdminEdit = (ticketId, field, value) => {
     if (field === 'status') {
       setAdminEdits(prev => ({
@@ -428,7 +409,7 @@ function App() {
     }
   };
 
-  // Exclui chamado (somente admin)
+  // Exclui chamado (admin)
   const handleDeleteTicket = async (ticketId, ticket) => {
     if (window.confirm("Tem certeza que deseja excluir este chamado?")) {
       await sendTicketUpdateEmail(ticket, "Chamado excluído pelo admin");
@@ -436,15 +417,14 @@ function App() {
     }
   };
 
-  // Filtra tickets: admin vê todos; usuário, somente os seus (baseado no e-mail)
+  // Filtra tickets
   const visibleTickets = !currentUser 
     ? [] 
     : tickets.filter(ticket => {
         return ticket.emailSolicitante === currentUser.email ||
-               ["jonathan.kauer@guiainvest.com.br", "nayla.martins@guiainvest.com.br"].includes(currentUser.email.toLowerCase());
+               ["jonathan.kauer@guiainvest.com.br", "nayla.martins@guiainvest.com.br"]
+                .includes(currentUser.email.toLowerCase());
       });
-
-  // Filtra pela aba ativa
   const tabFilteredTickets = visibleTickets.filter(ticket => {
     return activeTab === "open" 
       ? ticket.status !== "Concluído" 
@@ -477,6 +457,7 @@ function App() {
           localStorage.setItem("users", JSON.stringify(users));
           alert("Senha cadastrada com sucesso!");
         }
+        // Para admin que logam como usuário, isAdmin será false
         setCurrentUser({ email: loginEmail, isAdmin: false });
         setLoginEmail("");
         setLoginPassword("");
@@ -500,14 +481,18 @@ function App() {
     }
   };
 
-  // Handler para resetar a senha
+  const handleLogout = () => {
+    setCurrentUser(null);
+  };
+
+  // Handler para redefinir senha
   const handleResetPassword = () => {
     if (!loginEmail.trim()) {
-      alert("Por favor, insira seu e-mail para resetar a senha.");
+      alert("Por favor, insira seu e-mail para redefinir a senha.");
       return;
     }
     const newPass = prompt("Digite sua nova senha:");
-    if (!newPass || newPass.trim().length === 0) {
+    if (!newPass || !newPass.trim()) {
       alert("Nova senha inválida!");
       return;
     }
@@ -519,11 +504,7 @@ function App() {
     const users = JSON.parse(localStorage.getItem("users") || "{}");
     users[loginEmail] = newPass;
     localStorage.setItem("users", JSON.stringify(users));
-    alert("Senha resetada com sucesso! Agora use a nova senha para fazer login.");
-  };
-
-  const handleLogout = () => {
-    setCurrentUser(null);
+    alert("Senha redefinida com sucesso! Agora use a nova senha para fazer login.");
   };
 
   return (
@@ -533,7 +514,7 @@ function App() {
         <link rel="icon" href="/guiainvest-logo.png" />
       </Helmet>
 
-      {/* Botão Sair no canto superior direito */}
+      {/* Botão Sair */}
       {currentUser && (
         <div className="absolute top-4 right-4">
           <button 
@@ -588,7 +569,7 @@ function App() {
                 Entrar
               </button>
               <button type="button" onClick={handleResetPassword} className="px-3 py-1 rounded shadow" style={{ backgroundColor: "#FF5E00", color: "white" }}>
-                Reset de Senha
+                Redefinir senha
               </button>
             </div>
           </form>
@@ -622,33 +603,36 @@ function App() {
                 Concluídos
               </button>
             </div>
-            <div className="flex flex-col sm:flex-row items-center gap-2">
-              <select value={adminFilterPriority} onChange={e => setAdminFilterPriority(e.target.value)} className="border rounded px-2 py-1">
-                <option value="">Prioridade: Todas</option>
-                {priorityOptions.map((p, idx) => (
-                  <option key={idx} value={p}>
-                    {p}
-                  </option>
-                ))}
-              </select>
-              <select value={adminFilterCategory} onChange={e => setAdminFilterCategory(e.target.value)} className="border rounded px-2 py-1">
-                <option value="">Categoria: Todas</option>
-                {categoryOptions.filter(cat => cat !== "+Novo").map((cat, idx) => (
-                  <option key={idx} value={cat}>
-                    {cat}
-                  </option>
-                ))}
-              </select>
-              <select value={adminFilterAtendente} onChange={e => setAdminFilterAtendente(e.target.value)} className="border rounded px-2 py-1">
-                <option value="">Atendente: Todos</option>
-                {atendenteOptions.map((opt, idx) => (
-                  <option key={idx} value={opt}>{opt}</option>
-                ))}
-              </select>
-            </div>
+            {/* Os filtros só serão exibidos se o usuário for admin */}
+            {currentUser.isAdmin && (
+              <div className="flex flex-col sm:flex-row items-center gap-2">
+                <select value={adminFilterPriority} onChange={e => setAdminFilterPriority(e.target.value)} className="border rounded px-2 py-1">
+                  <option value="">Prioridade: Todas</option>
+                  {priorityOptions.map((p, idx) => (
+                    <option key={idx} value={p}>
+                      {p}
+                    </option>
+                  ))}
+                </select>
+                <select value={adminFilterCategory} onChange={e => setAdminFilterCategory(e.target.value)} className="border rounded px-2 py-1">
+                  <option value="">Categoria: Todas</option>
+                  {categoryOptions.filter(cat => cat !== "+Novo").map((cat, idx) => (
+                    <option key={idx} value={cat}>
+                      {cat}
+                    </option>
+                  ))}
+                </select>
+                <select value={adminFilterAtendente} onChange={e => setAdminFilterAtendente(e.target.value)} className="border rounded px-2 py-1">
+                  <option value="">Atendente: Todos</option>
+                  {atendenteOptions.map((opt, idx) => (
+                    <option key={idx} value={opt}>{opt}</option>
+                  ))}
+                </select>
+              </div>
+            )}
           </div>
 
-          {/* Botão "Criar Novo Chamado" para Usuários (quando não está no ambiente admin) */}
+          {/* Botão "Criar Novo Chamado" para usuários (não admin) */}
           {!currentUser.isAdmin && (
             <div className="mb-4 flex justify-center">
               <button onClick={() => setShowNewTicketForm(true)} className="px-3 py-1 rounded shadow" style={{ backgroundColor: "#FF5E00", color: "white" }}>
@@ -794,7 +778,6 @@ function App() {
                       )}
                     </div>
                   </div>
-
                   {expandedTickets[ticket.id] && (
                     <div className="mt-4">
                       {!(["jonathan.kauer@guiainvest.com.br", "nayla.martins@guiainvest.com.br"].includes(currentUser.email.toLowerCase())) && (
