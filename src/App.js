@@ -360,7 +360,6 @@ function App() {
         setTickets(prev =>
           prev.map(ticketItem => {
             if (ticketItem.id === ticketId) {
-              // Se estiver concluindo, define dataResolucao e calcula SLA
               let dataResolucao = ticketItem.dataResolucao;
               let sla = ticketItem.sla;
               if (newStatus === "Concluído") {
@@ -374,7 +373,6 @@ function App() {
                 sla,
                 responsavel: edits.responsavel ?? ticketItem.responsavel,
               };
-              // Se houver comentário do admin, adiciona-o
               if (commentText && commentText.trim()) {
                 const adminComment = {
                   text: commentText,
@@ -397,7 +395,7 @@ function App() {
         });
         setNewComments(prev => ({ ...prev, [ticketId]: "" }));
         setNewCommentFilesByTicket(prev => ({ ...prev, [ticketId]: [] }));
-        return; // Para admin, a atualização é feita via este bloco
+        return;
       }
     }
 
@@ -428,14 +426,12 @@ function App() {
 
   // Atualiza chamado diretamente (para os edits do admin)
   const handleAdminEdit = (ticketId, field, value) => {
-    // Se o admin alterar o status para "Concluído", atualizamos dataResolucao automaticamente
     if (field === 'status') {
       setAdminEdits(prev => ({
         ...prev,
         [ticketId]: {
           ...prev[ticketId],
           status: value,
-          // Se concluir, dataResolucao e SLA serão definidos em handleAddComment
           ...(value !== "Concluído" && { dataResolucao: "" })
         }
       }));
@@ -469,7 +465,7 @@ function App() {
     const isConcluded =
       ticket.status === "Concluído" &&
       ticket.dataResolucao &&
-      isValidDate(ticket.dataResolucao.split(" ")[0]); // checando só a data
+      isValidDate(ticket.dataResolucao.split(" ")[0]);
     return activeTab === "open" ? !isConcluded : isConcluded;
   });
 
@@ -501,7 +497,6 @@ function App() {
       alert("Por favor, preencha todos os campos de login.");
       return;
     }
-    // Para admin, somente os e-mails permitidos
     if (loginAdmin) {
       const allowedAdminEmails = ["jonathan.kauer@guiainvest.com.br", "nayla.martins@guiainvest.com.br"];
       if (!allowedAdminEmails.includes(loginEmail.toLowerCase())) {
@@ -511,6 +506,19 @@ function App() {
       if (loginPassword !== "admin123@guiainvestgpt") {
         alert("Senha incorreta para Admin!");
         return;
+      }
+    } else {
+      // Para usuários não-admin, cadastramos a senha se for o primeiro login
+      const users = JSON.parse(localStorage.getItem("users") || "{}");
+      if (users[loginEmail]) {
+        if (users[loginEmail] !== loginPassword) {
+          alert("Senha incorreta!");
+          return;
+        }
+      } else {
+        users[loginEmail] = loginPassword;
+        localStorage.setItem("users", JSON.stringify(users));
+        alert("Senha cadastrada com sucesso!");
       }
     }
     setCurrentUser({ email: loginEmail });
@@ -561,6 +569,9 @@ function App() {
               required
               className="border rounded px-2 py-1 w-full"
             />
+            <small className="text-gray-500">
+              No primeiro acesso, sua senha será cadastrada automaticamente.
+            </small>
           </div>
           <div className="mb-2 flex items-center">
             <input
