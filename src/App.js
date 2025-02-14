@@ -79,13 +79,18 @@ const renderAttachments = (files) => (
   </ul>
 );
 
-// Função para calcular o SLA (diferença entre duas datas) em horas e minutos
+// Função para calcular o SLA (diferença entre duas datas) de forma adequada
 const computeSLA = (start, end) => {
   const diffMs = end - start;
-  const totalMinutes = Math.floor(diffMs / 60000);
-  const hours = Math.floor(totalMinutes / 60);
-  const minutes = totalMinutes % 60;
-  return `${hours}h ${minutes}m`;
+  const diffMinutes = Math.floor(diffMs / 60000);
+  if (diffMinutes < 60) {
+    return `${diffMinutes} minutos`;
+  }
+  const hours = Math.floor(diffMinutes / 60);
+  const minutes = diffMinutes % 60;
+  return minutes === 0 
+    ? `${hours} horas` 
+    : `${hours} horas e ${minutes} minutos`;
 };
 
 // Função que envia e-mails usando Promise.all e modo "no-cors"
@@ -131,10 +136,8 @@ const sendTicketUpdateEmail = async (ticket, updateDescription) => {
 function App() {
   // Estados de login (somente e-mail e senha)
   const [currentUser, setCurrentUser] = useState(null); // objeto: { email }
-  const [isAdmin, setIsAdmin] = useState(false);
   const [loginEmail, setLoginEmail] = useState("");
   const [loginPassword, setLoginPassword] = useState("");
-  const [loginAdmin, setLoginAdmin] = useState(false);
 
   // Estados dos chamados e do formulário de novo chamado
   const [tickets, setTickets] = useState([]);
@@ -173,9 +176,6 @@ function App() {
 
   // Estado para as abas: "open" e "closed"
   const [activeTab, setActiveTab] = useState("open");
-
-  // Estado para busca geral (admin)
-  const [searchQuery, setSearchQuery] = useState("");
 
   // Alterações temporárias do admin
   const [adminEdits, setAdminEdits] = useState({});
@@ -439,7 +439,7 @@ function App() {
   const visibleTickets = !currentUser 
     ? [] 
     : tickets.filter(ticket => {
-        if (isAdmin) return true;
+        if (/* Se admin, mostra todos */ isAdmin) return true;
         return ticket.emailSolicitante === currentUser.email;
       });
 
@@ -450,29 +450,7 @@ function App() {
       : ticket.status === "Concluído";
   });
 
-  // Aplica busca e filtros (para admin)
-  const displayedTickets = tabFilteredTickets.filter(ticket => {
-    const searchLower = searchQuery.toLowerCase();
-    const combinedText = (
-      ticket.id +
-      " " +
-      ticket.nomeSolicitante +
-      " " +
-      ticket.descricaoProblema +
-      " " +
-      ticket.categoria +
-      " " +
-      ticket.prioridade
-    ).toLowerCase();
-    const matchesSearch = combinedText.includes(searchLower);
-    const matchesPriority = adminFilterPriority ? ticket.prioridade === adminFilterPriority : true;
-    // Agora usamos todas as opções definidas em categoryOptions (exceto "+Novo")
-    const matchesCategory = adminFilterCategory 
-      ? ticket.categoria === adminFilterCategory 
-      : true;
-    const matchesAtendente = adminFilterAtendente ? ticket.responsavel === adminFilterAtendente : true;
-    return matchesSearch && matchesPriority && matchesCategory && matchesAtendente;
-  });
+  // (Campo de busca removido)
 
   // Handler para login (somente e-mail e senha)
   const handleLoginSubmit = (e) => {
@@ -481,48 +459,46 @@ function App() {
       alert("Por favor, preencha todos os campos de login.");
       return;
     }
-    if (loginAdmin) {
-      const allowedAdminEmails = ["jonathan.kauer@guiainvest.com.br", "nayla.martins@guiainvest.com.br"];
-      if (!allowedAdminEmails.includes(loginEmail.toLowerCase())) {
-        alert("E-mail de Admin inválido!");
-        return;
-      }
-      if (loginPassword !== "admin123@guiainvestgpt") {
-        alert("Senha incorreta para Admin!");
+    // Cadastro de senha para usuários (primeiro login)
+    const users = JSON.parse(localStorage.getItem("users") || "{}");
+    if (users[loginEmail]) {
+      if (users[loginEmail] !== loginPassword) {
+        alert("Senha incorreta!");
         return;
       }
     } else {
-      // Cadastro de senha para usuários (primeiro login)
-      const users = JSON.parse(localStorage.getItem("users") || "{}");
-      if (users[loginEmail]) {
-        if (users[loginEmail] !== loginPassword) {
-          alert("Senha incorreta!");
-          return;
-        }
-      } else {
-        users[loginEmail] = loginPassword;
-        localStorage.setItem("users", JSON.stringify(users));
-        alert("Senha cadastrada com sucesso!");
-      }
+      users[loginEmail] = loginPassword;
+      localStorage.setItem("users", JSON.stringify(users));
+      alert("Senha cadastrada com sucesso!");
     }
     setCurrentUser({ email: loginEmail });
-    setIsAdmin(loginAdmin);
     setLoginEmail("");
     setLoginPassword("");
-    setLoginAdmin(false);
   };
 
   const handleLogout = () => {
     setCurrentUser(null);
-    setIsAdmin(false);
   };
 
   return (
-    <div className="min-h-screen bg-gray-100 flex flex-col items-center p-4" style={{ color: "#0E1428" }}>
+    <div className="min-h-screen bg-gray-100 relative p-4" style={{ color: "#0E1428" }}>
       <Helmet>
         <title>FinDesk</title>
         <link rel="icon" href="/guiainvest-logo.png" />
       </Helmet>
+
+      {/* Botão Sair no canto superior direito */}
+      {currentUser && (
+        <div className="absolute top-4 right-4">
+          <button 
+            onClick={handleLogout} 
+            className="px-3 py-1 rounded shadow" 
+            style={{ backgroundColor: "#FF5E00", color: "white" }}
+          >
+            Sair
+          </button>
+        </div>
+      )}
 
       <img src="/logo.png" alt="FinDesk Logo" className="h-12 mb-4" />
       <motion.h1 className="text-3xl font-bold mb-4" initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }}>
@@ -553,18 +529,9 @@ function App() {
               required
               className="border rounded px-2 py-1 w-full"
             />
-            <small className="text-gray-500">
+            <small className="text-gray-500" style={{ fontSize: "0.75rem" }}>
               No primeiro acesso, sua senha será cadastrada automaticamente.
             </small>
-          </div>
-          <div className="mb-2 flex items-center">
-            <input
-              type="checkbox"
-              checked={loginAdmin}
-              onChange={e => setLoginAdmin(e.target.checked)}
-              className="mr-2"
-            />
-            <span>Entrar como Admin</span>
           </div>
           <button type="submit" className="px-3 py-1 rounded shadow" style={{ backgroundColor: "#0E1428", color: "white" }}>
             Entrar
@@ -576,72 +543,32 @@ function App() {
       {currentUser && (
         <>
           <div className="flex flex-col sm:flex-row items-center gap-2 mb-4 w-full max-w-5xl">
-            <div className="flex items-center gap-2">
-              <p className="text-lg">
-                Logado como: <span className="font-bold">{currentUser.email}</span> {isAdmin && <span className="text-red-500">(Admin)</span>}
-              </p>
-              <button onClick={handleLogout} className="px-3 py-1 rounded shadow" style={{ backgroundColor: "#0E1428", color: "white" }}>
-                Sair
-              </button>
-            </div>
-            <div className="ml-auto flex flex-col sm:flex-row items-center gap-2">
-              <input
-                type="text"
-                placeholder="Buscar chamados..."
-                value={searchQuery}
-                onChange={e => setSearchQuery(e.target.value)}
-                className="border rounded px-2 py-1"
-              />
-              {isAdmin && (
-                <div className="flex flex-col sm:flex-row gap-2">
-                  <select value={adminFilterPriority} onChange={e => setAdminFilterPriority(e.target.value)} className="border rounded px-2 py-1">
-                    <option value="">Prioridade: Todas</option>
-                    {priorityOptions.map((p, idx) => (
-                      <option key={idx} value={p}>
-                        {p}
-                      </option>
-                    ))}
-                  </select>
-                  <select value={adminFilterCategory} onChange={e => setAdminFilterCategory(e.target.value)} className="border rounded px-2 py-1">
-                    <option value="">Categoria: Todas</option>
-                    {categoryOptions.filter(cat => cat !== "+Novo").map((cat, idx) => (
-                      <option key={idx} value={cat}>
-                        {cat}
-                      </option>
-                    ))}
-                  </select>
-                  <select value={adminFilterAtendente} onChange={e => setAdminFilterAtendente(e.target.value)} className="border rounded px-2 py-1">
-                    <option value="">Atendente: Todos</option>
-                    {atendenteOptions.map((opt, idx) => (
-                      <option key={idx} value={opt}>{opt}</option>
-                    ))}
-                  </select>
-                </div>
-              )}
-            </div>
-          </div>
-
-          <div className="flex gap-4 mb-4 w-full max-w-5xl">
-            <button 
-              onClick={() => setActiveTab("open")} 
-              className="px-3 py-1 rounded" 
-              style={ activeTab === "open" 
-                ? { backgroundColor: "#0E1428", color: "white" } 
-                : { backgroundColor: "#f2f2f2", color: "#0E1428", border: "1px solid #0E1428" } 
-              }
-            >
-              Abertos e em andamento
-            </button>
-            <button 
-              onClick={() => setActiveTab("closed")} 
-              className="px-3 py-1 rounded" 
-              style={ activeTab === "closed" 
-                ? { backgroundColor: "#0E1428", color: "white" } 
-                : { backgroundColor: "#f2f2f2", color: "#0E1428", border: "1px solid #0E1428" } 
-              }
-            >
-              Concluídos
-            </button>
+            {isAdmin && (
+              <div className="flex flex-col sm:flex-row items-center gap-2">
+                <select value={adminFilterPriority} onChange={e => setAdminFilterPriority(e.target.value)} className="border rounded px-2 py-1">
+                  <option value="">Prioridade: Todas</option>
+                  {priorityOptions.map((p, idx) => (
+                    <option key={idx} value={p}>
+                      {p}
+                    </option>
+                  ))}
+                </select>
+                <select value={adminFilterCategory} onChange={e => setAdminFilterCategory(e.target.value)} className="border rounded px-2 py-1">
+                  <option value="">Categoria: Todas</option>
+                  {categoryOptions.filter(cat => cat !== "+Novo").map((cat, idx) => (
+                    <option key={idx} value={cat}>
+                      {cat}
+                    </option>
+                  ))}
+                </select>
+                <select value={adminFilterAtendente} onChange={e => setAdminFilterAtendente(e.target.value)} className="border rounded px-2 py-1">
+                  <option value="">Atendente: Todos</option>
+                  {atendenteOptions.map((opt, idx) => (
+                    <option key={idx} value={opt}>{opt}</option>
+                  ))}
+                </select>
+              </div>
+            )}
           </div>
 
           {!isAdmin && (
@@ -725,7 +652,7 @@ function App() {
           )}
 
           <div className="grid gap-4 w-full max-w-5xl">
-            {displayedTickets.map(ticket => {
+            {tabFilteredTickets.map(ticket => {
               const isExpired = ticket.status !== "Concluído" && new Date() > new Date(ticket.prazoFinalizacao);
               return (
                 <motion.div
@@ -738,14 +665,9 @@ function App() {
                 >
                   <div className="flex justify-between items-center">
                     <div>
-                      {isAdmin ? (
-                        <>
-                          <h2 className="text-xl font-bold">Solicitante: {ticket.nomeSolicitante}</h2>
-                          <p className="text-gray-700"><span className="font-semibold">ID:</span> {ticket.id}</p>
-                        </>
-                      ) : (
-                        <h2 className="text-xl font-bold">ID: {ticket.id}</h2>
-                      )}
+                      <h2 className="text-xl font-bold">
+                        {isAdmin ? `Solicitante: ${ticket.nomeSolicitante}` : `ID: ${ticket.id}`}
+                      </h2>
                       <p className="text-gray-700">
                         <span className="font-semibold">Categoria:</span> {ticket.categoria} |{" "}
                         <span className="font-semibold">Prioridade:</span> {ticket.prioridade}
@@ -808,15 +730,19 @@ function App() {
                       <div className="mb-2">
                         <label className="font-semibold">Status:</label>{" "}
                         {isAdmin ? (
-                          <select
-                            value={adminEdits[ticket.id]?.status ?? ticket.status}
-                            onChange={e => handleAdminEdit(ticket.id, 'status', e.target.value)}
-                            className="border rounded px-2 py-1 ml-1"
-                          >
-                            {statusOptions.map((option, idx) => (
-                              <option key={idx} value={option}>{option}</option>
-                            ))}
-                          </select>
+                          ticket.status === "Concluído" ? (
+                            <span className="ml-1">{ticket.status}</span>
+                          ) : (
+                            <select
+                              value={adminEdits[ticket.id]?.status ?? ticket.status}
+                              onChange={e => handleAdminEdit(ticket.id, 'status', e.target.value)}
+                              className="border rounded px-2 py-1 ml-1"
+                            >
+                              {statusOptions.map((option, idx) => (
+                                <option key={idx} value={option}>{option}</option>
+                              ))}
+                            </select>
+                          )
                         ) : (
                           <span className="ml-1">{ticket.status}</span>
                         )}
@@ -824,16 +750,20 @@ function App() {
                       {isAdmin && (
                         <div className="mb-2">
                           <label className="font-semibold">Atendente:</label>{" "}
-                          <select
-                            value={adminEdits[ticket.id]?.responsavel ?? ticket.responsavel}
-                            onChange={e => handleAdminEdit(ticket.id, 'responsavel', e.target.value)}
-                            className="border rounded px-2 py-1 ml-1"
-                          >
-                            <option value="">Selecione</option>
-                            {atendenteOptions.map((opt, idx) => (
-                              <option key={idx} value={opt}>{opt}</option>
-                            ))}
-                          </select>
+                          {ticket.status === "Concluído" ? (
+                            <span className="ml-1">{ticket.responsavel || "Não definido"}</span>
+                          ) : (
+                            <select
+                              value={adminEdits[ticket.id]?.responsavel ?? ticket.responsavel}
+                              onChange={e => handleAdminEdit(ticket.id, 'responsavel', e.target.value)}
+                              className="border rounded px-2 py-1 ml-1"
+                            >
+                              <option value="">Selecione</option>
+                              {atendenteOptions.map((opt, idx) => (
+                                <option key={idx} value={opt}>{opt}</option>
+                              ))}
+                            </select>
+                          )}
                         </div>
                       )}
                       {ticket.attachments && ticket.attachments.length > 0 && (
@@ -868,7 +798,7 @@ function App() {
                           </div>
                         ))}
                       </div>
-                      {!(isAdmin && ticket.status === "Concluído") && (
+                      {ticket.status !== "Concluído" && (
                         <div className="mb-4">
                           <textarea
                             value={newComments[ticket.id] || ""}
@@ -886,15 +816,6 @@ function App() {
                             >
                               Salvar
                             </button>
-                            {!isAdmin && ticket.status === "Concluído" && (
-                              <button
-                                onClick={() => handleReopenTicket(ticket.id)}
-                                className="px-3 py-1 rounded-lg shadow"
-                                style={{ backgroundColor: "#FF5E00", color: "white" }}
-                              >
-                                Reabrir chamado
-                              </button>
-                            )}
                           </div>
                         </div>
                       )}
