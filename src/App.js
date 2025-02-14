@@ -34,7 +34,7 @@ const priorityDaysMapping = {
   "Urgente (1 dia útil)": 1,
 };
 
-// Função para adicionar dias úteis a uma data (desconsidera sábado e domingo)
+// Adiciona dias úteis a uma data (desconsidera sábado e domingo)
 function addBusinessDays(date, days) {
   let result = new Date(date);
   while (days > 0) {
@@ -47,7 +47,7 @@ function addBusinessDays(date, days) {
   return result;
 }
 
-// Função para gerar um ID aleatório de 13 caracteres
+// Gera um ID aleatório de 13 caracteres
 function generateTicketId() {
   const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
   let result = "";
@@ -57,7 +57,7 @@ function generateTicketId() {
   return result;
 }
 
-// Função auxiliar para renderizar anexos como links para download/visualização
+// Renderiza anexos como links para download/visualização
 const renderAttachments = (files) => (
   <ul className="list-disc list-inside">
     {files.map((file, idx) => {
@@ -79,7 +79,7 @@ const renderAttachments = (files) => (
   </ul>
 );
 
-// Função para calcular o SLA (diferença entre duas datas) de forma adequada
+// Calcula o SLA (diferença entre duas datas) de forma adequada
 const computeSLA = (start, end) => {
   const diffMs = end - start;
   const diffMinutes = Math.floor(diffMs / 60000);
@@ -91,7 +91,7 @@ const computeSLA = (start, end) => {
   return minutes === 0 ? `${hours} horas` : `${hours} horas e ${minutes} minutos`;
 };
 
-// Função que envia e-mails (modo no-cors)
+// Envia e-mails usando Promise.all (modo "no-cors")
 const sendTicketUpdateEmail = async (ticket, updateDescription) => {
   const subject = `Findesk: Atualização em chamado`;
   const body =
@@ -138,6 +138,7 @@ function App() {
   const [tickets, setTickets] = useState([]);
   const [showNewTicketForm, setShowNewTicketForm] = useState(false);
 
+  // Ao criar um ticket, armazenamos também a data de abertura em ISO para cálculos
   const [newTicketNome, setNewTicketNome] = useState("");
   const [cargoDepartamento, setCargoDepartamento] = useState("");
   const [descricaoProblema, setDescricaoProblema] = useState("");
@@ -153,10 +154,10 @@ function App() {
     "Clientes",
     "Comissões e/ou SplitC",
     "Basement",
-    "+Novo",
+    "+Novo"
   ]);
 
-  // Filtros aparecem somente para admins (currentUser.isAdmin true)
+  // Filtros, visíveis somente se currentUser.isAdmin for true
   const [adminFilterPriority, setAdminFilterPriority] = useState("");
   const [adminFilterCategory, setAdminFilterCategory] = useState("");
   const [adminFilterAtendente, setAdminFilterAtendente] = useState("");
@@ -202,7 +203,7 @@ function App() {
     if (value === "+Novo") {
       const novaCategoria = prompt("Digite a nova categoria:");
       if (novaCategoria) {
-        const optionsWithoutNovo = categoryOptions.filter((opt) => opt !== "+Novo");
+        const optionsWithoutNovo = categoryOptions.filter(opt => opt !== "+Novo");
         setCategoryOptions([...optionsWithoutNovo, novaCategoria, "+Novo"]);
         setCategoria(novaCategoria);
       } else {
@@ -220,7 +221,7 @@ function App() {
   const handleCommentFileChange = (ticketId, e) => {
     setNewCommentFilesByTicket((prev) => ({
       ...prev,
-      [ticketId]: Array.from(e.target.files),
+      [ticketId]: Array.from(e.target.files)
     }));
   };
 
@@ -231,6 +232,9 @@ function App() {
       return;
     }
     const dataDeAbertura = new Date();
+    // Armazena a data de abertura em ISO para cálculos e em formato local para exibição
+    const dataDeAberturaISO = dataDeAbertura.toISOString();
+    const dataDeAberturaDisplay = dataDeAbertura.toLocaleString();
     const daysToAdd = priorityDaysMapping[prioridade] || 0;
     const prazoFinalizacaoDate = addBusinessDays(dataDeAbertura, daysToAdd);
     const prazoFinalizacao = prazoFinalizacaoDate.toISOString();
@@ -242,7 +246,8 @@ function App() {
       descricaoProblema,
       categoria,
       prioridade,
-      dataDeAbertura: dataDeAbertura.toLocaleString(),
+      dataDeAbertura: dataDeAberturaDisplay,
+      dataDeAberturaISO,
       prazoFinalizacao,
       status: "Aberto",
       dataResolucao: "",
@@ -262,7 +267,39 @@ function App() {
     sendTicketUpdateEmail(newTicket, "Abertura de novo chamado");
   };
 
-  // Função handleAddComment simplificada para adicionar o comentário ao ticket
+  const handleReopenTicket = (ticketId) => {
+    const commentText = newComments[ticketId];
+    if (!commentText || !commentText.trim()) {
+      alert("Insira informações adicionais para reabrir o chamado.");
+      return;
+    }
+    setTickets((prev) =>
+      prev.map((ticket) => {
+        if (ticket.id === ticketId) {
+          const reopenComment = {
+            text: "Reabertura: " + commentText,
+            user: ticket.nomeSolicitante,
+            timestamp: new Date().toLocaleString(),
+            attachments: newCommentFilesByTicket[ticketId] || [],
+          };
+          const updatedTicket = {
+            ...ticket,
+            status: "Aberto",
+            dataResolucao: "",
+            sla: "",
+            comentarios: [...ticket.comentarios, reopenComment],
+          };
+          sendTicketUpdateEmail(updatedTicket, `Chamado reaberto. Comentário: ${reopenComment.text}`);
+          return updatedTicket;
+        }
+        return ticket;
+      })
+    );
+    setNewComments((prev) => ({ ...prev, [ticketId]: "" }));
+    setNewCommentFilesByTicket((prev) => ({ ...prev, [ticketId]: [] }));
+  };
+
+  // Função handleAddComment refatorada e simplificada
   const handleAddComment = (ticketId) => {
     console.log("handleAddComment called for ticket:", ticketId);
     const commentText = newComments[ticketId];
@@ -275,40 +312,36 @@ function App() {
       console.log("Chamado não encontrado.");
       return;
     }
-    // Se o usuário for admin e houver edições, atualiza status e atendente
+    // Se o usuário for admin e houver edições em adminEdits para este ticket, atualiza status/atendente
     let updatedTicket = { ...ticket };
     if (currentUser.isAdmin && adminEdits[ticketId]) {
       if (adminEdits[ticketId].status) {
         updatedTicket.status = adminEdits[ticketId].status;
         if (adminEdits[ticketId].status === "Concluído") {
           updatedTicket.dataResolucao = new Date().toLocaleString();
-          updatedTicket.sla = computeSLA(new Date(ticket.dataDeAbertura), new Date());
+          updatedTicket.sla = computeSLA(new Date(ticket.dataDeAberturaISO), new Date());
         }
       }
       if (adminEdits[ticketId].responsavel) {
         updatedTicket.responsavel = adminEdits[ticketId].responsavel;
       }
     }
-    // Cria o comentário (para admin, se não houver edições, trata igual ao usuário comum)
+    // Cria o objeto de comentário
     const comment = {
       text: commentText,
       user: currentUser.isAdmin ? ("Admin: " + (ticket.responsavel || "")) : ticket.nomeSolicitante,
       timestamp: new Date().toLocaleString(),
-      attachments: newCommentFilesByTicket[ticketId] || [],
+      attachments: newCommentFilesByTicket[ticketId] || []
     };
     updatedTicket.comentarios = [...ticket.comentarios, comment];
     console.log("Updated ticket:", updatedTicket);
     sendTicketUpdateEmail(updatedTicket, `Novo comentário adicionado: ${comment.text}`);
-    
-    // Atualiza o estado de tickets
     setTickets((prev) =>
       prev.map((t) => (t.id === ticketId ? updatedTicket : t))
     );
-    // Limpa o campo de comentário e anexos
     setNewComments((prev) => ({ ...prev, [ticketId]: "" }));
     setNewCommentFilesByTicket((prev) => ({ ...prev, [ticketId]: [] }));
-    // Se houver edições admin, limpar também
-    if (currentUser.isAdmin) {
+    if (currentUser.isAdmin && adminEdits[ticketId]) {
       setAdminEdits((prev) => {
         const newEdits = { ...prev };
         delete newEdits[ticketId];
@@ -324,16 +357,16 @@ function App() {
         [ticketId]: {
           ...prev[ticketId],
           status: value,
-          ...(value !== "Concluído" && { dataResolucao: "" }),
-        },
+          ...(value !== "Concluído" && { dataResolucao: "" })
+        }
       }));
     } else {
       setAdminEdits((prev) => ({
         ...prev,
         [ticketId]: {
           ...prev[ticketId],
-          [field]: value,
-        },
+          [field]: value
+        }
       }));
     }
   };
@@ -348,12 +381,8 @@ function App() {
   const visibleTickets = !currentUser
     ? []
     : tickets.filter((ticket) => {
-        return (
-          ticket.emailSolicitante === currentUser.email ||
-          ["jonathan.kauer@guiainvest.com.br", "nayla.martins@guiainvest.com.br"].includes(
-            currentUser.email.toLowerCase()
-          )
-        );
+        return ticket.emailSolicitante === currentUser.email ||
+          ["jonathan.kauer@guiainvest.com.br", "nayla.martins@guiainvest.com.br"].includes(currentUser.email.toLowerCase());
       });
   const tabFilteredTickets = visibleTickets.filter((ticket) => {
     return activeTab === "open" ? ticket.status !== "Concluído" : ticket.status === "Concluído";
@@ -384,7 +413,7 @@ function App() {
           localStorage.setItem("users", JSON.stringify(users));
           alert("Senha cadastrada com sucesso!");
         }
-        // Admin logado como usuário
+        // Admin que logam como usuário terão isAdmin: false
         setCurrentUser({ email: loginEmail, isAdmin: false });
         setLoginEmail("");
         setLoginPassword("");
@@ -552,20 +581,16 @@ function App() {
                 </select>
                 <select value={adminFilterCategory} onChange={(e) => setAdminFilterCategory(e.target.value)} className="border rounded px-2 py-1">
                   <option value="">Categoria: Todas</option>
-                  {categoryOptions
-                    .filter((cat) => cat !== "+Novo")
-                    .map((cat, idx) => (
-                      <option key={idx} value={cat}>
-                        {cat}
-                      </option>
-                    ))}
+                  {categoryOptions.filter(cat => cat !== "+Novo").map((cat, idx) => (
+                    <option key={idx} value={cat}>
+                      {cat}
+                    </option>
+                  ))}
                 </select>
                 <select value={adminFilterAtendente} onChange={(e) => setAdminFilterAtendente(e.target.value)} className="border rounded px-2 py-1">
                   <option value="">Atendente: Todos</option>
                   {atendenteOptions.map((opt, idx) => (
-                    <option key={idx} value={opt}>
-                      {opt}
-                    </option>
+                    <option key={idx} value={opt}>{opt}</option>
                   ))}
                 </select>
               </div>
@@ -653,18 +678,10 @@ function App() {
                 <input type="file" multiple onChange={handleTicketFileChange} className="w-full" />
               </div>
               <div className="flex justify-end gap-2 mt-4">
-                <button
-                  type="button"
-                  onClick={() => setShowNewTicketForm(false)}
-                  className="px-3 py-1 bg-gray-300 rounded"
-                >
+                <button type="button" onClick={() => setShowNewTicketForm(false)} className="px-3 py-1 bg-gray-300 rounded">
                   Cancelar
                 </button>
-                <button
-                  type="submit"
-                  className="px-3 py-1 rounded"
-                  style={{ backgroundColor: "#0E1428", color: "white" }}
-                >
+                <button type="submit" className="px-3 py-1 rounded" style={{ backgroundColor: "#0E1428", color: "white" }}>
                   Criar Chamado
                 </button>
               </div>
@@ -673,9 +690,7 @@ function App() {
 
           <div className="grid gap-4 w-full max-w-5xl mx-auto">
             {tabFilteredTickets.map((ticket) => {
-              const isExpired =
-                ticket.status !== "Concluído" &&
-                new Date() > new Date(ticket.prazoFinalizacao);
+              const isExpired = ticket.status !== "Concluído" && new Date() > new Date(ticket.prazoFinalizacao);
               return (
                 <motion.div
                   key={ticket.id}
@@ -812,7 +827,13 @@ function App() {
                                   const fileURL = URL.createObjectURL(file);
                                   return (
                                     <li key={i}>
-                                      <a href={fileURL} download target="_blank" rel="noopener noreferrer" className="text-blue-600 underline">
+                                      <a
+                                        href={fileURL}
+                                        download
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="text-blue-600 underline"
+                                      >
                                         {file.name}
                                       </a>
                                     </li>
@@ -824,7 +845,7 @@ function App() {
                           </div>
                         ))}
                       </div>
-                      {ticket.status !== "Concluído" && (
+                      {ticket.status !== "Concluído" ? (
                         <div className="mb-4">
                           <textarea
                             value={newComments[ticket.id] || ""}
@@ -851,6 +872,19 @@ function App() {
                             </button>
                           </div>
                         </div>
+                      ) : (
+                        // Se o chamado estiver concluído e o usuário não for admin, exibe o botão de reabertura
+                        !currentUser.isAdmin && (
+                          <div className="mb-4 flex justify-center">
+                            <button
+                              onClick={() => handleReopenTicket(ticket.id)}
+                              className="px-3 py-1 rounded shadow"
+                              style={{ backgroundColor: "#FF5E00", color: "white" }}
+                            >
+                              Reabrir Chamado
+                            </button>
+                          </div>
+                        )
                       )}
                     </div>
                   )}
