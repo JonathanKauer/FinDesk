@@ -79,22 +79,6 @@ const renderAttachments = (files) => (
   </ul>
 );
 
-// Função para validar datas no formato dd/mm/aaaa (para casos específicos)
-const isValidDate = (dateStr) => {
-  const regex = /^(0[1-9]|[12]\d|3[01])\/(0[1-9]|1[0-2])\/\d{4}$/;
-  if (!regex.test(dateStr)) return false;
-  const parts = dateStr.split('/');
-  const day = parseInt(parts[0], 10);
-  const month = parseInt(parts[1], 10);
-  const year = parseInt(parts[2], 10);
-  const date = new Date(year, month - 1, day);
-  return (
-    date.getFullYear() === year &&
-    date.getMonth() === month - 1 &&
-    date.getDate() === day
-  );
-};
-
 // Função para calcular o SLA (diferença entre duas datas) em horas e minutos
 const computeSLA = (start, end) => {
   const diffMs = end - start;
@@ -350,12 +334,10 @@ function App() {
     if (isAdmin) {
       const edits = adminEdits[ticketId] || {};
       const newStatus = edits.status ?? ticket.status;
-      // Se o admin estiver tentando atualizar para "Concluído", exige um comentário
       if (newStatus === "Concluído" && (!commentText || !commentText.trim())) {
         alert("Ao concluir o chamado, é necessário adicionar um comentário.");
         return;
       }
-      // Se houver edições (como mudança de status ou atendente)
       if (edits.status || edits.responsavel) {
         setTickets(prev =>
           prev.map(ticketItem => {
@@ -399,7 +381,6 @@ function App() {
       }
     }
 
-    // Se não for admin (ou para adicionar comentário em ticket não concluído)
     const comment = {
       text: commentText,
       user: ticket.nomeSolicitante,
@@ -455,18 +436,18 @@ function App() {
   };
 
   // Filtra tickets: admin vê todos; usuário, somente os seus (baseado no e-mail)
-  const visibleTickets = tickets.filter(ticket => {
-    if (isAdmin) return true;
-    return ticket.emailSolicitante === currentUser.email;
-  });
+  const visibleTickets = !currentUser 
+    ? [] 
+    : tickets.filter(ticket => {
+        if (isAdmin) return true;
+        return ticket.emailSolicitante === currentUser.email;
+      });
 
-  // Filtra pela aba ativa
+  // Filtra pela aba ativa (para admin, simplificado)
   const tabFilteredTickets = visibleTickets.filter(ticket => {
-    const isConcluded =
-      ticket.status === "Concluído" &&
-      ticket.dataResolucao &&
-      isValidDate(ticket.dataResolucao.split(" ")[0]);
-    return activeTab === "open" ? !isConcluded : isConcluded;
+    return activeTab === "open" 
+      ? ticket.status !== "Concluído" 
+      : ticket.status === "Concluído";
   });
 
   // Aplica busca e filtros (para admin)
@@ -485,7 +466,10 @@ function App() {
     ).toLowerCase();
     const matchesSearch = combinedText.includes(searchLower);
     const matchesPriority = adminFilterPriority ? ticket.prioridade === adminFilterPriority : true;
-    const matchesCategory = adminFilterCategory ? ticket.categoria === adminFilterCategory : true;
+    // Agora usamos todas as opções definidas em categoryOptions (exceto "+Novo")
+    const matchesCategory = adminFilterCategory 
+      ? ticket.categoria === adminFilterCategory 
+      : true;
     const matchesAtendente = adminFilterAtendente ? ticket.responsavel === adminFilterAtendente : true;
     return matchesSearch && matchesPriority && matchesCategory && matchesAtendente;
   });
@@ -508,7 +492,7 @@ function App() {
         return;
       }
     } else {
-      // Para usuários não-admin, cadastramos a senha se for o primeiro login
+      // Cadastro de senha para usuários (primeiro login)
       const users = JSON.parse(localStorage.getItem("users") || "{}");
       if (users[loginEmail]) {
         if (users[loginEmail] !== loginPassword) {
@@ -620,7 +604,7 @@ function App() {
                   </select>
                   <select value={adminFilterCategory} onChange={e => setAdminFilterCategory(e.target.value)} className="border rounded px-2 py-1">
                     <option value="">Categoria: Todas</option>
-                    {Array.from(new Set(tickets.map(ticket => ticket.categoria))).map((cat, idx) => (
+                    {categoryOptions.filter(cat => cat !== "+Novo").map((cat, idx) => (
                       <option key={idx} value={cat}>
                         {cat}
                       </option>
