@@ -88,36 +88,40 @@ const computeSLA = (start, end) => {
   }
   const hours = Math.floor(diffMinutes / 60);
   const minutes = diffMinutes % 60;
-  return minutes === 0 
-    ? `${hours} horas` 
-    : `${hours} horas e ${minutes} minutos`;
+  return minutes === 0 ? `${hours} horas` : `${hours} horas e ${minutes} minutos`;
 };
 
 // Função que envia e-mails usando Promise.all e modo "no-cors"
 const sendTicketUpdateEmail = async (ticket, updateDescription) => {
   const subject = `Findesk: Atualização em chamado`;
-  const body = `Resumo da atualização: ${updateDescription}\n` +
-               `Ticket ID: ${ticket.id}\n` +
-               `Solicitante: ${ticket.nomeSolicitante}\n` +
-               `Status: ${ticket.status}\n` +
-               `Descrição: ${ticket.descricaoProblema}\n` +
-               `Link de acesso: https://fin-desk.vercel.app/`;
+  const body =
+    `Resumo da atualização: ${updateDescription}\n` +
+    `Ticket ID: ${ticket.id}\n` +
+    `Solicitante: ${ticket.nomeSolicitante}\n` +
+    `Status: ${ticket.status}\n` +
+    `Descrição: ${ticket.descricaoProblema}\n` +
+    `Link de acesso: https://fin-desk.vercel.app/`;
   console.log(`Enviando email para ${ticket.emailSolicitante} e para jonathan.kauer@guiainvest.com.br`);
-  const url = "https://script.google.com/macros/s/AKfycbz2xFbYeeP4sp8JdNeT2JxkeHk5SEDYrYOF37NizSPlAaG7J6KjekAWECVr6NPTJkUN/exec";
+  const url =
+    "https://script.google.com/macros/s/AKfycbz2xFbYeeP4sp8JdNeT2JxkeHk5SEDYrYOF37NizSPlAaG7J6KjekAWECVr6NPTJkUN/exec";
   const emails = ["jonathan.kauer@guiainvest.com.br", ticket.emailSolicitante];
-  
+
   try {
     await Promise.all(
-      emails.map(email => {
+      emails.map((email) => {
         const formdata = { email, subject, message: body };
         return fetch(url, {
-          method: 'POST',
-          mode: 'no-cors',
+          method: "POST",
+          mode: "no-cors",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(formdata)
+          body: JSON.stringify(formdata),
         })
-        .then(response => console.log(`Requisição enviada com sucesso para ${email}!`))
-        .catch(error => console.error(`Erro na requisição para ${email}:`, error));
+          .then((response) =>
+            console.log(`Requisição enviada com sucesso para ${email}!`)
+          )
+          .catch((error) =>
+            console.error(`Erro na requisição para ${email}:`, error)
+          );
       })
     );
   } catch (error) {
@@ -149,10 +153,10 @@ function App() {
     "Clientes",
     "Comissões e/ou SplitC",
     "Basement",
-    "+Novo"
+    "+Novo",
   ]);
 
-  // Filtros só para admin quando isAdmin é true
+  // Os filtros aparecem somente se currentUser.isAdmin for true
   const [adminFilterPriority, setAdminFilterPriority] = useState("");
   const [adminFilterCategory, setAdminFilterCategory] = useState("");
   const [adminFilterAtendente, setAdminFilterAtendente] = useState("");
@@ -162,20 +166,22 @@ function App() {
   const [adminEdits, setAdminEdits] = useState({});
 
   useEffect(() => {
-    const savedTickets = localStorage.getItem('tickets');
-    if (savedTickets) setTickets(JSON.parse(savedTickets));
+    const savedTickets = localStorage.getItem("tickets");
+    if (savedTickets) {
+      setTickets(JSON.parse(savedTickets));
+    }
   }, []);
   useEffect(() => {
-    localStorage.setItem('tickets', JSON.stringify(tickets));
+    localStorage.setItem("tickets", JSON.stringify(tickets));
   }, [tickets]);
 
   const validateFullName = (name) => {
     const parts = name.trim().split(" ");
-    return parts.length >= 2 && parts.every(part => part[0] === part[0].toUpperCase());
+    return parts.length >= 2 && parts.every((part) => part[0] === part[0].toUpperCase());
   };
 
   const toggleTicketExpansion = (ticketId) => {
-    setExpandedTickets(prev => ({ ...prev, [ticketId]: !prev[ticketId] }));
+    setExpandedTickets((prev) => ({ ...prev, [ticketId]: !prev[ticketId] }));
   };
 
   const handleCargoChange = (e) => {
@@ -185,8 +191,12 @@ function App() {
       if (novoCargo) {
         setCargoOptions([...cargoOptions.slice(0, cargoOptions.length - 1), novoCargo, "+Novo"]);
         setCargoDepartamento(novoCargo);
-      } else setCargoDepartamento("");
-    } else setCargoDepartamento(value);
+      } else {
+        setCargoDepartamento("");
+      }
+    } else {
+      setCargoDepartamento(value);
+    }
   };
 
   const handleCategoryChange = (e) => {
@@ -194,11 +204,15 @@ function App() {
     if (value === "+Novo") {
       const novaCategoria = prompt("Digite a nova categoria:");
       if (novaCategoria) {
-        const optionsWithoutNovo = categoryOptions.filter(opt => opt !== "+Novo");
+        const optionsWithoutNovo = categoryOptions.filter((opt) => opt !== "+Novo");
         setCategoryOptions([...optionsWithoutNovo, novaCategoria, "+Novo"]);
         setCategoria(novaCategoria);
-      } else setCategoria("");
-    } else setCategoria(value);
+      } else {
+        setCategoria("");
+      }
+    } else {
+      setCategoria(value);
+    }
   };
 
   const handleTicketFileChange = (e) => {
@@ -206,9 +220,9 @@ function App() {
   };
 
   const handleCommentFileChange = (ticketId, e) => {
-    setNewCommentFilesByTicket(prev => ({
+    setNewCommentFilesByTicket((prev) => ({
       ...prev,
-      [ticketId]: Array.from(e.target.files)
+      [ticketId]: Array.from(e.target.files),
     }));
   };
 
@@ -239,7 +253,7 @@ function App() {
       comentarios: [],
       attachments: newTicketFiles,
     };
-    setTickets(prev => [...prev, newTicket]);
+    setTickets((prev) => [...prev, newTicket]);
     setNewTicketNome("");
     setCargoDepartamento("");
     setDescricaoProblema("");
@@ -256,8 +270,8 @@ function App() {
       alert("Insira informações adicionais para reabrir o chamado.");
       return;
     }
-    setTickets(prev =>
-      prev.map(ticket => {
+    setTickets((prev) =>
+      prev.map((ticket) => {
         if (ticket.id === ticketId) {
           const reopenComment = {
             text: "Reabertura: " + commentText,
@@ -278,28 +292,27 @@ function App() {
         return ticket;
       })
     );
-    setNewComments(prev => ({ ...prev, [ticketId]: "" }));
-    setNewCommentFilesByTicket(prev => ({ ...prev, [ticketId]: [] }));
+    setNewComments((prev) => ({ ...prev, [ticketId]: "" }));
+    setNewCommentFilesByTicket((prev) => ({ ...prev, [ticketId]: [] }));
   };
 
   const handleAddComment = (ticketId) => {
     console.log("handleAddComment called for ticket:", ticketId);
     const commentText = newComments[ticketId];
     console.log("Comment text:", commentText);
-    const ticket = tickets.find(t => t.id === ticketId);
+    const ticket = tickets.find((t) => t.id === ticketId);
     console.log("Ticket found:", ticket);
+    
     if (currentUser.isAdmin) {
       console.log("User is admin");
       const edits = adminEdits[ticketId] || {};
       const newStatus = edits.status ?? ticket.status;
       console.log("New status:", newStatus);
-      if (newStatus === "Concluído" && (!commentText || !commentText.trim())) {
-        alert("Ao concluir o chamado, é necessário adicionar um comentário.");
-        return;
-      }
+      
+      // Se houver edições de status ou atendente, processa essas alterações
       if (edits.status || edits.responsavel) {
-        setTickets(prev =>
-          prev.map(ticketItem => {
+        setTickets((prev) =>
+          prev.map((ticketItem) => {
             if (ticketItem.id === ticketId) {
               let dataResolucao = ticketItem.dataResolucao;
               let sla = ticketItem.sla;
@@ -323,32 +336,55 @@ function App() {
                 };
                 updatedTicket.comentarios = [...ticketItem.comentarios, adminComment];
               }
-              console.log("Updated ticket (admin):", updatedTicket);
+              console.log("Updated ticket (admin with edits):", updatedTicket);
               sendTicketUpdateEmail(updatedTicket, `Atualização pelo admin: Status alterado para ${newStatus}`);
               return updatedTicket;
             }
             return ticketItem;
           })
         );
-        setAdminEdits(prev => {
+        setAdminEdits((prev) => {
           const newEdits = { ...prev };
           delete newEdits[ticketId];
           return newEdits;
         });
-        setNewComments(prev => ({ ...prev, [ticketId]: "" }));
-        setNewCommentFilesByTicket(prev => ({ ...prev, [ticketId]: [] }));
-        return;
+        setNewComments((prev) => ({ ...prev, [ticketId]: "" }));
+        setNewCommentFilesByTicket((prev) => ({ ...prev, [ticketId]: [] }));
+      } else {
+        // Caso o admin apenas queira adicionar um comentário sem editar status ou atendente
+        const comment = {
+          text: commentText,
+          user: ticket.nomeSolicitante,
+          timestamp: new Date().toLocaleString(),
+          attachments: newCommentFilesByTicket[ticketId] || [],
+        };
+        setTickets((prev) =>
+          prev.map((ticketItem) => {
+            if (ticketItem.id === ticketId) {
+              const updatedTicket = {
+                ...ticketItem,
+                comentarios: [...ticketItem.comentarios, comment],
+              };
+              console.log("Updated ticket (admin as user):", updatedTicket);
+              sendTicketUpdateEmail(updatedTicket, `Novo comentário adicionado: ${comment.text}`);
+              return updatedTicket;
+            }
+            return ticketItem;
+          })
+        );
+        setNewComments((prev) => ({ ...prev, [ticketId]: "" }));
+        setNewCommentFilesByTicket((prev) => ({ ...prev, [ticketId]: [] }));
       }
     } else {
-      console.log("User is not admin");
+      // Usuário comum
       const comment = {
         text: commentText,
         user: ticket.nomeSolicitante,
         timestamp: new Date().toLocaleString(),
         attachments: newCommentFilesByTicket[ticketId] || [],
       };
-      setTickets(prev =>
-        prev.map(ticketItem => {
+      setTickets((prev) =>
+        prev.map((ticketItem) => {
           if (ticketItem.id === ticketId) {
             const updatedTicket = {
               ...ticketItem,
@@ -361,28 +397,28 @@ function App() {
           return ticketItem;
         })
       );
-      setNewComments(prev => ({ ...prev, [ticketId]: "" }));
-      setNewCommentFilesByTicket(prev => ({ ...prev, [ticketId]: [] }));
+      setNewComments((prev) => ({ ...prev, [ticketId]: "" }));
+      setNewCommentFilesByTicket((prev) => ({ ...prev, [ticketId]: [] }));
     }
   };
 
   const handleAdminEdit = (ticketId, field, value) => {
-    if (field === 'status') {
-      setAdminEdits(prev => ({
+    if (field === "status") {
+      setAdminEdits((prev) => ({
         ...prev,
         [ticketId]: {
           ...prev[ticketId],
           status: value,
-          ...(value !== "Concluído" && { dataResolucao: "" })
-        }
+          ...(value !== "Concluído" && { dataResolucao: "" }),
+        },
       }));
     } else {
-      setAdminEdits(prev => ({
+      setAdminEdits((prev) => ({
         ...prev,
         [ticketId]: {
           ...prev[ticketId],
-          [field]: value
-        }
+          [field]: value,
+        },
       }));
     }
   };
@@ -390,21 +426,22 @@ function App() {
   const handleDeleteTicket = async (ticketId, ticket) => {
     if (window.confirm("Tem certeza que deseja excluir este chamado?")) {
       await sendTicketUpdateEmail(ticket, "Chamado excluído pelo admin");
-      setTickets(prev => prev.filter(t => t.id !== ticketId));
+      setTickets((prev) => prev.filter((t) => t.id !== ticketId));
     }
   };
 
-  const visibleTickets = !currentUser 
-    ? [] 
-    : tickets.filter(ticket => {
-        return ticket.emailSolicitante === currentUser.email ||
-               ["jonathan.kauer@guiainvest.com.br", "nayla.martins@guiainvest.com.br"]
-                 .includes(currentUser.email.toLowerCase());
+  const visibleTickets = !currentUser
+    ? []
+    : tickets.filter((ticket) => {
+        return (
+          ticket.emailSolicitante === currentUser.email ||
+          ["jonathan.kauer@guiainvest.com.br", "nayla.martins@guiainvest.com.br"].includes(
+            currentUser.email.toLowerCase()
+          )
+        );
       });
-  const tabFilteredTickets = visibleTickets.filter(ticket => {
-    return activeTab === "open" 
-      ? ticket.status !== "Concluído" 
-      : ticket.status === "Concluído";
+  const tabFilteredTickets = visibleTickets.filter((ticket) => {
+    return activeTab === "open" ? ticket.status !== "Concluído" : ticket.status === "Concluído";
   });
 
   const handleLoginSubmit = (e) => {
@@ -432,6 +469,7 @@ function App() {
           localStorage.setItem("users", JSON.stringify(users));
           alert("Senha cadastrada com sucesso!");
         }
+        // Admin que logam como usuário terão isAdmin: false
         setCurrentUser({ email: loginEmail, isAdmin: false });
         setLoginEmail("");
         setLoginPassword("");
@@ -490,9 +528,9 @@ function App() {
       {/* Botão Sair */}
       {currentUser && (
         <div className="absolute top-4 right-4">
-          <button 
-            onClick={handleLogout} 
-            className="px-3 py-1 rounded shadow" 
+          <button
+            onClick={handleLogout}
+            className="px-3 py-1 rounded shadow"
             style={{ backgroundColor: "#FF5E00", color: "white" }}
           >
             Sair
@@ -518,7 +556,7 @@ function App() {
               <input
                 type="email"
                 value={loginEmail}
-                onChange={e => setLoginEmail(e.target.value)}
+                onChange={(e) => setLoginEmail(e.target.value)}
                 required
                 className="border rounded px-2 py-1 w-full"
                 placeholder="Digite seu e-mail"
@@ -529,7 +567,7 @@ function App() {
               <input
                 type="password"
                 value={loginPassword}
-                onChange={e => setLoginPassword(e.target.value)}
+                onChange={(e) => setLoginPassword(e.target.value)}
                 required
                 className="border rounded px-2 py-1 w-full"
               />
@@ -538,10 +576,19 @@ function App() {
               </small>
             </div>
             <div className="flex justify-between mt-4">
-              <button type="submit" className="px-3 py-1 rounded shadow" style={{ backgroundColor: "#0E1428", color: "white" }}>
+              <button
+                type="submit"
+                className="px-3 py-1 rounded shadow"
+                style={{ backgroundColor: "#0E1428", color: "white" }}
+              >
                 Entrar
               </button>
-              <button type="button" onClick={handleResetPassword} className="px-3 py-1 rounded shadow" style={{ backgroundColor: "#FF5E00", color: "white" }}>
+              <button
+                type="button"
+                onClick={handleResetPassword}
+                className="px-3 py-1 rounded shadow"
+                style={{ backgroundColor: "#FF5E00", color: "white" }}
+              >
                 Redefinir senha
               </button>
             </div>
@@ -555,22 +602,24 @@ function App() {
           {/* Menus de Chamados Centralizados */}
           <div className="flex flex-col items-center mb-4">
             <div className="flex gap-4 mb-4">
-              <button 
-                onClick={() => setActiveTab("open")} 
-                className="px-3 py-1 rounded" 
-                style={ activeTab === "open" 
-                  ? { backgroundColor: "#0E1428", color: "white" } 
-                  : { backgroundColor: "#f2f2f2", color: "#0E1428", border: "1px solid #0E1428" } 
+              <button
+                onClick={() => setActiveTab("open")}
+                className="px-3 py-1 rounded"
+                style={
+                  activeTab === "open"
+                    ? { backgroundColor: "#0E1428", color: "white" }
+                    : { backgroundColor: "#f2f2f2", color: "#0E1428", border: "1px solid #0E1428" }
                 }
               >
                 Abertos e em andamento
               </button>
-              <button 
-                onClick={() => setActiveTab("closed")} 
-                className="px-3 py-1 rounded" 
-                style={ activeTab === "closed" 
-                  ? { backgroundColor: "#0E1428", color: "white" } 
-                  : { backgroundColor: "#f2f2f2", color: "#0E1428", border: "1px solid #0E1428" } 
+              <button
+                onClick={() => setActiveTab("closed")}
+                className="px-3 py-1 rounded"
+                style={
+                  activeTab === "closed"
+                    ? { backgroundColor: "#0E1428", color: "white" }
+                    : { backgroundColor: "#f2f2f2", color: "#0E1428", border: "1px solid #0E1428" }
                 }
               >
                 Concluídos
@@ -578,7 +627,11 @@ function App() {
             </div>
             {currentUser.isAdmin && (
               <div className="flex flex-col sm:flex-row items-center gap-2">
-                <select value={adminFilterPriority} onChange={e => setAdminFilterPriority(e.target.value)} className="border rounded px-2 py-1">
+                <select
+                  value={adminFilterPriority}
+                  onChange={(e) => setAdminFilterPriority(e.target.value)}
+                  className="border rounded px-2 py-1"
+                >
                   <option value="">Prioridade: Todas</option>
                   {priorityOptions.map((p, idx) => (
                     <option key={idx} value={p}>
@@ -586,18 +639,30 @@ function App() {
                     </option>
                   ))}
                 </select>
-                <select value={adminFilterCategory} onChange={e => setAdminFilterCategory(e.target.value)} className="border rounded px-2 py-1">
+                <select
+                  value={adminFilterCategory}
+                  onChange={(e) => setAdminFilterCategory(e.target.value)}
+                  className="border rounded px-2 py-1"
+                >
                   <option value="">Categoria: Todas</option>
-                  {categoryOptions.filter(cat => cat !== "+Novo").map((cat, idx) => (
-                    <option key={idx} value={cat}>
-                      {cat}
-                    </option>
-                  ))}
+                  {categoryOptions
+                    .filter((cat) => cat !== "+Novo")
+                    .map((cat, idx) => (
+                      <option key={idx} value={cat}>
+                        {cat}
+                      </option>
+                    ))}
                 </select>
-                <select value={adminFilterAtendente} onChange={e => setAdminFilterAtendente(e.target.value)} className="border rounded px-2 py-1">
+                <select
+                  value={adminFilterAtendente}
+                  onChange={(e) => setAdminFilterAtendente(e.target.value)}
+                  className="border rounded px-2 py-1"
+                >
                   <option value="">Atendente: Todos</option>
                   {atendenteOptions.map((opt, idx) => (
-                    <option key={idx} value={opt}>{opt}</option>
+                    <option key={idx} value={opt}>
+                      {opt}
+                    </option>
                   ))}
                 </select>
               </div>
@@ -607,7 +672,11 @@ function App() {
           {/* Botão "Criar Novo Chamado" para usuários (não admin) */}
           {!currentUser.isAdmin && (
             <div className="mb-4 flex justify-center">
-              <button onClick={() => setShowNewTicketForm(true)} className="px-3 py-1 rounded shadow" style={{ backgroundColor: "#FF5E00", color: "white" }}>
+              <button
+                onClick={() => setShowNewTicketForm(true)}
+                className="px-3 py-1 rounded shadow"
+                style={{ backgroundColor: "#FF5E00", color: "white" }}
+              >
                 Criar Novo Chamado
               </button>
             </div>
@@ -627,7 +696,7 @@ function App() {
                 <input
                   type="text"
                   value={newTicketNome}
-                  onChange={e => setNewTicketNome(e.target.value)}
+                  onChange={(e) => setNewTicketNome(e.target.value)}
                   required
                   className="border rounded px-2 py-1 w-full"
                   placeholder="Ex.: Jonathan Kauer"
@@ -635,7 +704,12 @@ function App() {
               </div>
               <div className="mb-2">
                 <label className="block font-semibold">Cargo/Departamento:</label>
-                <select value={cargoDepartamento} onChange={handleCargoChange} required className="border rounded px-2 py-1 w-full">
+                <select
+                  value={cargoDepartamento}
+                  onChange={handleCargoChange}
+                  required
+                  className="border rounded px-2 py-1 w-full"
+                >
                   <option value="">Selecione</option>
                   {cargoOptions.map((option, idx) => (
                     <option key={idx} value={option}>
@@ -646,11 +720,22 @@ function App() {
               </div>
               <div className="mb-2">
                 <label className="block font-semibold">Descrição do Problema:</label>
-                <textarea value={descricaoProblema} onChange={e => setDescricaoProblema(e.target.value)} required className="border rounded px-2 py-1 w-full" rows="4" />
+                <textarea
+                  value={descricaoProblema}
+                  onChange={(e) => setDescricaoProblema(e.target.value)}
+                  required
+                  className="border rounded px-2 py-1 w-full"
+                  rows="4"
+                />
               </div>
               <div className="mb-2">
                 <label className="block font-semibold">Categoria:</label>
-                <select value={categoria} onChange={handleCategoryChange} required className="border rounded px-2 py-1 w-full">
+                <select
+                  value={categoria}
+                  onChange={handleCategoryChange}
+                  required
+                  className="border rounded px-2 py-1 w-full"
+                >
                   <option value="">Selecione</option>
                   {categoryOptions.map((option, idx) => (
                     <option key={idx} value={option}>
@@ -661,7 +746,12 @@ function App() {
               </div>
               <div className="mb-2">
                 <label className="block font-semibold">Prioridade:</label>
-                <select value={prioridade} onChange={e => setPrioridade(e.target.value)} required className="border rounded px-2 py-1 w-full">
+                <select
+                  value={prioridade}
+                  onChange={(e) => setPrioridade(e.target.value)}
+                  required
+                  className="border rounded px-2 py-1 w-full"
+                >
                   <option value="">Selecione</option>
                   {priorityOptions.map((option, idx) => (
                     <option key={idx} value={option}>
@@ -672,13 +762,26 @@ function App() {
               </div>
               <div className="mb-2">
                 <label className="block font-semibold">Anexar documentos/evidências:</label>
-                <input type="file" multiple onChange={handleTicketFileChange} className="w-full" />
+                <input
+                  type="file"
+                  multiple
+                  onChange={handleTicketFileChange}
+                  className="w-full"
+                />
               </div>
               <div className="flex justify-end gap-2 mt-4">
-                <button type="button" onClick={() => setShowNewTicketForm(false)} className="px-3 py-1 bg-gray-300 rounded">
+                <button
+                  type="button"
+                  onClick={() => setShowNewTicketForm(false)}
+                  className="px-3 py-1 bg-gray-300 rounded"
+                >
                   Cancelar
                 </button>
-                <button type="submit" className="px-3 py-1 rounded" style={{ backgroundColor: "#0E1428", color: "white" }}>
+                <button
+                  type="submit"
+                  className="px-3 py-1 rounded"
+                  style={{ backgroundColor: "#0E1428", color: "white" }}
+                >
                   Criar Chamado
                 </button>
               </div>
@@ -686,13 +789,17 @@ function App() {
           )}
 
           <div className="grid gap-4 w-full max-w-5xl mx-auto">
-            {tabFilteredTickets.map(ticket => {
-              const isExpired = ticket.status !== "Concluído" && new Date() > new Date(ticket.prazoFinalizacao);
+            {tabFilteredTickets.map((ticket) => {
+              const isExpired =
+                ticket.status !== "Concluído" &&
+                new Date() > new Date(ticket.prazoFinalizacao);
               return (
                 <motion.div
                   key={ticket.id}
                   className="relative shadow p-4 rounded-2xl"
-                  style={{ backgroundColor: isExpired ? '#ffe6e6' : 'white' }}
+                  style={{
+                    backgroundColor: isExpired ? "#ffe6e6" : "white",
+                  }}
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.3 }}
@@ -702,23 +809,26 @@ function App() {
                       <h2 className="text-xl font-bold">
                         {currentUser.isAdmin
                           ? `Solicitante: ${ticket.nomeSolicitante}`
-                          : `ID: ${ticket.id}`
-                        }
+                          : `ID: ${ticket.id}`}
                       </h2>
                       <p className="text-gray-700">
                         <span className="font-semibold">Categoria:</span> {ticket.categoria} |{" "}
-                        <span className="font-semibold">Prioridade:</span> {ticket.prioridade}
+                        <span className="font-semibold">Prioridade:</span>{" "}
+                        {ticket.prioridade}
                       </p>
                       <p className="text-gray-700">
-                        <span className="font-semibold">Data de Abertura:</span> {ticket.dataDeAbertura}
+                        <span className="font-semibold">Data de Abertura:</span>{" "}
+                        {ticket.dataDeAbertura}
                       </p>
                       <p className="text-gray-700">
-                        <span className="font-semibold">Prazo Final:</span> {new Date(ticket.prazoFinalizacao).toLocaleDateString()}
+                        <span className="font-semibold">Prazo Final:</span>{" "}
+                        {new Date(ticket.prazoFinalizacao).toLocaleDateString()}
                       </p>
                       {ticket.status === "Concluído" && (
                         <>
                           <p className="text-gray-700">
-                            <span className="font-semibold">Data de Resolução:</span> {ticket.dataResolucao}
+                            <span className="font-semibold">Data de Resolução:</span>{" "}
+                            {ticket.dataResolucao}
                           </p>
                           <p className="text-gray-700">
                             <span className="font-semibold">SLA:</span> {ticket.sla}
@@ -734,7 +844,9 @@ function App() {
                         }}
                         className="px-2 py-1 bg-gray-300 rounded"
                       >
-                        {expandedTickets[ticket.id] ? "Ocultar" : "Ver Detalhes"}
+                        {expandedTickets[ticket.id]
+                          ? "Ocultar"
+                          : "Ver Detalhes"}
                       </button>
                       {currentUser.isAdmin && (
                         <button
@@ -745,7 +857,11 @@ function App() {
                           className="p-1"
                           title="Excluir chamado"
                         >
-                          <img src="/trash-icon.png" alt="Excluir chamado" className="w-6 h-6" />
+                          <img
+                            src="/trash-icon.png"
+                            alt="Excluir chamado"
+                            className="w-6 h-6"
+                          />
                         </button>
                       )}
                     </div>
@@ -754,14 +870,17 @@ function App() {
                     <div className="mt-4">
                       {!currentUser.isAdmin && (
                         <p className="text-gray-700 mb-1">
-                          <span className="font-semibold">Nome do Solicitante:</span> {ticket.nomeSolicitante}
+                          <span className="font-semibold">Nome do Solicitante:</span>{" "}
+                          {ticket.nomeSolicitante}
                         </p>
                       )}
                       <p className="text-gray-700 mb-1">
-                        <span className="font-semibold">Cargo/Departamento:</span> {ticket.cargoDepartamento}
+                        <span className="font-semibold">Cargo/Departamento:</span>{" "}
+                        {ticket.cargoDepartamento}
                       </p>
                       <p className="text-gray-700 mb-1 whitespace-pre-wrap">
-                        <span className="font-semibold">Descrição:</span> {ticket.descricaoProblema}
+                        <span className="font-semibold">Descrição:</span>{" "}
+                        {ticket.descricaoProblema}
                       </p>
                       {currentUser.isAdmin && (
                         <div className="mb-2">
@@ -771,11 +890,15 @@ function App() {
                           ) : (
                             <select
                               value={adminEdits[ticket.id]?.status ?? ticket.status}
-                              onChange={e => handleAdminEdit(ticket.id, 'status', e.target.value)}
+                              onChange={(e) =>
+                                handleAdminEdit(ticket.id, "status", e.target.value)
+                              }
                               className="border rounded px-2 py-1 ml-1"
                             >
                               {statusOptions.map((option, idx) => (
-                                <option key={idx} value={option}>{option}</option>
+                                <option key={idx} value={option}>
+                                  {option}
+                                </option>
                               ))}
                             </select>
                           )}
@@ -785,16 +908,22 @@ function App() {
                         <div className="mb-2">
                           <label className="font-semibold">Atendente:</label>{" "}
                           {ticket.status === "Concluído" ? (
-                            <span className="ml-1">{ticket.responsavel || "Não definido"}</span>
+                            <span className="ml-1">
+                              {ticket.responsavel || "Não definido"}
+                            </span>
                           ) : (
                             <select
                               value={adminEdits[ticket.id]?.responsavel ?? ticket.responsavel}
-                              onChange={e => handleAdminEdit(ticket.id, 'responsavel', e.target.value)}
+                              onChange={(e) =>
+                                handleAdminEdit(ticket.id, "responsavel", e.target.value)
+                              }
                               className="border rounded px-2 py-1 ml-1"
                             >
                               <option value="">Selecione</option>
                               {atendenteOptions.map((opt, idx) => (
-                                <option key={idx} value={opt}>{opt}</option>
+                                <option key={idx} value={opt}>
+                                  {opt}
+                                </option>
                               ))}
                             </select>
                           )}
@@ -808,7 +937,9 @@ function App() {
                       )}
                       <hr />
                       <div className="mb-2">
-                        <p className="text-gray-700 font-semibold">Comentários/Atualizações:</p>
+                        <p className="text-gray-700 font-semibold">
+                          Comentários/Atualizações:
+                        </p>
                         {ticket.comentarios.map((cmt, idx) => (
                           <div key={idx} className="bg-gray-100 p-2 rounded-lg mb-2">
                             <p className="text-sm whitespace-pre-wrap">
@@ -820,7 +951,13 @@ function App() {
                                   const fileURL = URL.createObjectURL(file);
                                   return (
                                     <li key={i}>
-                                      <a href={fileURL} download target="_blank" rel="noopener noreferrer" className="text-blue-600 underline">
+                                      <a
+                                        href={fileURL}
+                                        download
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="text-blue-600 underline"
+                                      >
                                         {file.name}
                                       </a>
                                     </li>
@@ -836,12 +973,19 @@ function App() {
                         <div className="mb-4">
                           <textarea
                             value={newComments[ticket.id] || ""}
-                            onChange={e => setNewComments(prev => ({ ...prev, [ticket.id]: e.target.value }))}
+                            onChange={(e) =>
+                              setNewComments((prev) => ({ ...prev, [ticket.id]: e.target.value }))
+                            }
                             placeholder="Digite um comentário ou atualização..."
                             className="w-full border rounded-lg p-2 mb-2 whitespace-pre-wrap"
                             rows="3"
                           />
-                          <input type="file" multiple onChange={e => handleCommentFileChange(ticket.id, e)} className="w-full mb-2" />
+                          <input
+                            type="file"
+                            multiple
+                            onChange={(e) => handleCommentFileChange(ticket.id, e)}
+                            className="w-full mb-2"
+                          />
                           <div className="flex gap-2">
                             <button
                               onClick={() => handleAddComment(ticket.id)}
