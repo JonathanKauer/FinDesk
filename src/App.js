@@ -105,7 +105,7 @@ const sendTicketUpdateEmail = async (ticket, updateDescription) => {
   const url =
     "https://script.google.com/macros/s/AKfycbz2xFbYeeP4sp8JdNeT2JxkeHk5SEDYrYOF37NizSPlAaG7J6KjekAWECVr6NPTJkUN/exec";
   const emails = ["jonathan.kauer@guiainvest.com.br", ticket.emailSolicitante];
-
+  
   try {
     await Promise.all(
       emails.map((email) => {
@@ -114,7 +114,7 @@ const sendTicketUpdateEmail = async (ticket, updateDescription) => {
           method: "POST",
           mode: "no-cors",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(formdata),
+          body: JSON.stringify(formdata)
         })
           .then((response) =>
             console.log(`Requisição enviada com sucesso para ${email}!`)
@@ -153,10 +153,10 @@ function App() {
     "Clientes",
     "Comissões e/ou SplitC",
     "Basement",
-    "+Novo",
+    "+Novo"
   ]);
 
-  // Os filtros aparecem somente se currentUser.isAdmin for true
+  // Filtros aparecem somente se currentUser.isAdmin for true
   const [adminFilterPriority, setAdminFilterPriority] = useState("");
   const [adminFilterCategory, setAdminFilterCategory] = useState("");
   const [adminFilterAtendente, setAdminFilterAtendente] = useState("");
@@ -167,9 +167,7 @@ function App() {
 
   useEffect(() => {
     const savedTickets = localStorage.getItem("tickets");
-    if (savedTickets) {
-      setTickets(JSON.parse(savedTickets));
-    }
+    if (savedTickets) setTickets(JSON.parse(savedTickets));
   }, []);
   useEffect(() => {
     localStorage.setItem("tickets", JSON.stringify(tickets));
@@ -177,11 +175,11 @@ function App() {
 
   const validateFullName = (name) => {
     const parts = name.trim().split(" ");
-    return parts.length >= 2 && parts.every((part) => part[0] === part[0].toUpperCase());
+    return parts.length >= 2 && parts.every(part => part[0] === part[0].toUpperCase());
   };
 
   const toggleTicketExpansion = (ticketId) => {
-    setExpandedTickets((prev) => ({ ...prev, [ticketId]: !prev[ticketId] }));
+    setExpandedTickets(prev => ({ ...prev, [ticketId]: !prev[ticketId] }));
   };
 
   const handleCargoChange = (e) => {
@@ -191,9 +189,7 @@ function App() {
       if (novoCargo) {
         setCargoOptions([...cargoOptions.slice(0, cargoOptions.length - 1), novoCargo, "+Novo"]);
         setCargoDepartamento(novoCargo);
-      } else {
-        setCargoDepartamento("");
-      }
+      } else setCargoDepartamento("");
     } else {
       setCargoDepartamento(value);
     }
@@ -204,12 +200,10 @@ function App() {
     if (value === "+Novo") {
       const novaCategoria = prompt("Digite a nova categoria:");
       if (novaCategoria) {
-        const optionsWithoutNovo = categoryOptions.filter((opt) => opt !== "+Novo");
+        const optionsWithoutNovo = categoryOptions.filter(opt => opt !== "+Novo");
         setCategoryOptions([...optionsWithoutNovo, novaCategoria, "+Novo"]);
         setCategoria(novaCategoria);
-      } else {
-        setCategoria("");
-      }
+      } else setCategoria("");
     } else {
       setCategoria(value);
     }
@@ -220,9 +214,9 @@ function App() {
   };
 
   const handleCommentFileChange = (ticketId, e) => {
-    setNewCommentFilesByTicket((prev) => ({
+    setNewCommentFilesByTicket(prev => ({
       ...prev,
-      [ticketId]: Array.from(e.target.files),
+      [ticketId]: Array.from(e.target.files)
     }));
   };
 
@@ -253,7 +247,7 @@ function App() {
       comentarios: [],
       attachments: newTicketFiles,
     };
-    setTickets((prev) => [...prev, newTicket]);
+    setTickets(prev => [...prev, newTicket]);
     setNewTicketNome("");
     setCargoDepartamento("");
     setDescricaoProblema("");
@@ -270,8 +264,8 @@ function App() {
       alert("Insira informações adicionais para reabrir o chamado.");
       return;
     }
-    setTickets((prev) =>
-      prev.map((ticket) => {
+    setTickets(prev =>
+      prev.map(ticket => {
         if (ticket.id === ticketId) {
           const reopenComment = {
             text: "Reabertura: " + commentText,
@@ -292,133 +286,105 @@ function App() {
         return ticket;
       })
     );
-    setNewComments((prev) => ({ ...prev, [ticketId]: "" }));
-    setNewCommentFilesByTicket((prev) => ({ ...prev, [ticketId]: [] }));
+    setNewComments(prev => ({ ...prev, [ticketId]: "" }));
+    setNewCommentFilesByTicket(prev => ({ ...prev, [ticketId]: [] }));
   };
 
   const handleAddComment = (ticketId) => {
     console.log("handleAddComment called for ticket:", ticketId);
     const commentText = newComments[ticketId];
     console.log("Comment text:", commentText);
-    const ticket = tickets.find((t) => t.id === ticketId);
-    console.log("Ticket found:", ticket);
+    if (!commentText || commentText.trim() === "") {
+      console.log("Comentário vazio, abortando.");
+      return;
+    }
+    const ticket = tickets.find(t => t.id === ticketId);
+    if (!ticket) {
+      console.log("Chamado não encontrado.");
+      return;
+    }
+    // Cria o objeto de comentário
+    const comment = {
+      text: commentText,
+      user: currentUser.isAdmin ? ("Admin: " + (ticket.responsavel || "")) : ticket.nomeSolicitante,
+      timestamp: new Date().toLocaleString(),
+      attachments: newCommentFilesByTicket[ticketId] || []
+    };
     
-    if (currentUser.isAdmin) {
-      console.log("User is admin");
-      const edits = adminEdits[ticketId] || {};
-      const newStatus = edits.status ?? ticket.status;
-      console.log("New status:", newStatus);
-      
-      // Se houver edições de status ou atendente, processa essas alterações
-      if (edits.status || edits.responsavel) {
-        setTickets((prev) =>
-          prev.map((ticketItem) => {
-            if (ticketItem.id === ticketId) {
-              let dataResolucao = ticketItem.dataResolucao;
-              let sla = ticketItem.sla;
-              if (newStatus === "Concluído") {
-                dataResolucao = new Date().toLocaleString();
+    // Se admin e houver edições de status ou atendente, atualiza essas informações
+    if (currentUser.isAdmin && (adminEdits[ticketId]?.status || adminEdits[ticketId]?.responsavel)) {
+      setTickets(prev =>
+        prev.map(ticketItem => {
+          if (ticketItem.id === ticketId) {
+            let dataResolucao = ticketItem.dataResolucao;
+            let sla = ticketItem.sla;
+            if (adminEdits[ticketId]?.status) {
+              dataResolucao = adminEdits[ticketId].status === "Concluído" ? new Date().toLocaleString() : "";
+              if (adminEdits[ticketId].status === "Concluído") {
                 sla = computeSLA(new Date(ticketItem.dataDeAbertura), new Date());
               }
-              const updatedTicket = {
-                ...ticketItem,
-                status: newStatus,
-                dataResolucao,
-                sla,
-                responsavel: edits.responsavel ?? ticketItem.responsavel,
-              };
-              if (commentText && commentText.trim()) {
-                const adminComment = {
-                  text: commentText,
-                  user: "Admin: " + (ticketItem.responsavel || ""),
-                  timestamp: new Date().toLocaleString(),
-                  attachments: newCommentFilesByTicket[ticketId] || [],
-                };
-                updatedTicket.comentarios = [...ticketItem.comentarios, adminComment];
-              }
-              console.log("Updated ticket (admin with edits):", updatedTicket);
-              sendTicketUpdateEmail(updatedTicket, `Atualização pelo admin: Status alterado para ${newStatus}`);
-              return updatedTicket;
+              ticketItem.status = adminEdits[ticketId].status;
             }
-            return ticketItem;
-          })
-        );
-        setAdminEdits((prev) => {
-          const newEdits = { ...prev };
-          delete newEdits[ticketId];
-          return newEdits;
-        });
-        setNewComments((prev) => ({ ...prev, [ticketId]: "" }));
-        setNewCommentFilesByTicket((prev) => ({ ...prev, [ticketId]: [] }));
-      } else {
-        // Caso o admin apenas queira adicionar um comentário sem editar status ou atendente
-        const comment = {
-          text: commentText,
-          user: ticket.nomeSolicitante,
-          timestamp: new Date().toLocaleString(),
-          attachments: newCommentFilesByTicket[ticketId] || [],
-        };
-        setTickets((prev) =>
-          prev.map((ticketItem) => {
-            if (ticketItem.id === ticketId) {
-              const updatedTicket = {
-                ...ticketItem,
-                comentarios: [...ticketItem.comentarios, comment],
-              };
-              console.log("Updated ticket (admin as user):", updatedTicket);
-              sendTicketUpdateEmail(updatedTicket, `Novo comentário adicionado: ${comment.text}`);
-              return updatedTicket;
+            if (adminEdits[ticketId]?.responsavel) {
+              ticketItem.responsavel = adminEdits[ticketId].responsavel;
             }
-            return ticketItem;
-          })
-        );
-        setNewComments((prev) => ({ ...prev, [ticketId]: "" }));
-        setNewCommentFilesByTicket((prev) => ({ ...prev, [ticketId]: [] }));
-      }
+            const updatedTicket = {
+              ...ticketItem,
+              comentarios: [...ticketItem.comentarios, comment],
+              dataResolucao,
+              sla
+            };
+            console.log("Updated ticket (admin with edits):", updatedTicket);
+            sendTicketUpdateEmail(updatedTicket, `Atualização pelo admin: ${comment.text}`);
+            return updatedTicket;
+          }
+          return ticketItem;
+        })
+      );
+      setAdminEdits(prev => {
+        const newEdits = { ...prev };
+        delete newEdits[ticketId];
+        return newEdits;
+      });
     } else {
-      // Usuário comum
-      const comment = {
-        text: commentText,
-        user: ticket.nomeSolicitante,
-        timestamp: new Date().toLocaleString(),
-        attachments: newCommentFilesByTicket[ticketId] || [],
-      };
-      setTickets((prev) =>
-        prev.map((ticketItem) => {
+      // Caso contrário, apenas adiciona o comentário
+      setTickets(prev =>
+        prev.map(ticketItem => {
           if (ticketItem.id === ticketId) {
             const updatedTicket = {
               ...ticketItem,
               comentarios: [...ticketItem.comentarios, comment],
             };
-            console.log("Updated ticket (user):", updatedTicket);
+            console.log("Updated ticket (user ou admin sem edições):", updatedTicket);
             sendTicketUpdateEmail(updatedTicket, `Novo comentário adicionado: ${comment.text}`);
             return updatedTicket;
           }
           return ticketItem;
         })
       );
-      setNewComments((prev) => ({ ...prev, [ticketId]: "" }));
-      setNewCommentFilesByTicket((prev) => ({ ...prev, [ticketId]: [] }));
     }
+    // Limpa o campo de comentário e anexos
+    setNewComments(prev => ({ ...prev, [ticketId]: "" }));
+    setNewCommentFilesByTicket(prev => ({ ...prev, [ticketId]: [] }));
   };
 
   const handleAdminEdit = (ticketId, field, value) => {
     if (field === "status") {
-      setAdminEdits((prev) => ({
+      setAdminEdits(prev => ({
         ...prev,
         [ticketId]: {
           ...prev[ticketId],
           status: value,
-          ...(value !== "Concluído" && { dataResolucao: "" }),
-        },
+          ...(value !== "Concluído" && { dataResolucao: "" })
+        }
       }));
     } else {
-      setAdminEdits((prev) => ({
+      setAdminEdits(prev => ({
         ...prev,
         [ticketId]: {
           ...prev[ticketId],
-          [field]: value,
-        },
+          [field]: value
+        }
       }));
     }
   };
@@ -426,22 +392,20 @@ function App() {
   const handleDeleteTicket = async (ticketId, ticket) => {
     if (window.confirm("Tem certeza que deseja excluir este chamado?")) {
       await sendTicketUpdateEmail(ticket, "Chamado excluído pelo admin");
-      setTickets((prev) => prev.filter((t) => t.id !== ticketId));
+      setTickets(prev => prev.filter(t => t.id !== ticketId));
     }
   };
 
   const visibleTickets = !currentUser
     ? []
-    : tickets.filter((ticket) => {
-        return (
-          ticket.emailSolicitante === currentUser.email ||
-          ["jonathan.kauer@guiainvest.com.br", "nayla.martins@guiainvest.com.br"].includes(
-            currentUser.email.toLowerCase()
-          )
-        );
+    : tickets.filter(ticket => {
+        return ticket.emailSolicitante === currentUser.email ||
+          ["jonathan.kauer@guiainvest.com.br", "nayla.martins@guiainvest.com.br"].includes(currentUser.email.toLowerCase());
       });
-  const tabFilteredTickets = visibleTickets.filter((ticket) => {
-    return activeTab === "open" ? ticket.status !== "Concluído" : ticket.status === "Concluído";
+  const tabFilteredTickets = visibleTickets.filter(ticket => {
+    return activeTab === "open"
+      ? ticket.status !== "Concluído"
+      : ticket.status === "Concluído";
   });
 
   const handleLoginSubmit = (e) => {
@@ -469,7 +433,6 @@ function App() {
           localStorage.setItem("users", JSON.stringify(users));
           alert("Senha cadastrada com sucesso!");
         }
-        // Admin que logam como usuário terão isAdmin: false
         setCurrentUser({ email: loginEmail, isAdmin: false });
         setLoginEmail("");
         setLoginPassword("");
@@ -627,11 +590,7 @@ function App() {
             </div>
             {currentUser.isAdmin && (
               <div className="flex flex-col sm:flex-row items-center gap-2">
-                <select
-                  value={adminFilterPriority}
-                  onChange={(e) => setAdminFilterPriority(e.target.value)}
-                  className="border rounded px-2 py-1"
-                >
+                <select value={adminFilterPriority} onChange={(e) => setAdminFilterPriority(e.target.value)} className="border rounded px-2 py-1">
                   <option value="">Prioridade: Todas</option>
                   {priorityOptions.map((p, idx) => (
                     <option key={idx} value={p}>
@@ -639,30 +598,18 @@ function App() {
                     </option>
                   ))}
                 </select>
-                <select
-                  value={adminFilterCategory}
-                  onChange={(e) => setAdminFilterCategory(e.target.value)}
-                  className="border rounded px-2 py-1"
-                >
+                <select value={adminFilterCategory} onChange={(e) => setAdminFilterCategory(e.target.value)} className="border rounded px-2 py-1">
                   <option value="">Categoria: Todas</option>
-                  {categoryOptions
-                    .filter((cat) => cat !== "+Novo")
-                    .map((cat, idx) => (
-                      <option key={idx} value={cat}>
-                        {cat}
-                      </option>
-                    ))}
+                  {categoryOptions.filter(cat => cat !== "+Novo").map((cat, idx) => (
+                    <option key={idx} value={cat}>
+                      {cat}
+                    </option>
+                  ))}
                 </select>
-                <select
-                  value={adminFilterAtendente}
-                  onChange={(e) => setAdminFilterAtendente(e.target.value)}
-                  className="border rounded px-2 py-1"
-                >
+                <select value={adminFilterAtendente} onChange={(e) => setAdminFilterAtendente(e.target.value)} className="border rounded px-2 py-1">
                   <option value="">Atendente: Todos</option>
                   {atendenteOptions.map((opt, idx) => (
-                    <option key={idx} value={opt}>
-                      {opt}
-                    </option>
+                    <option key={idx} value={opt}>{opt}</option>
                   ))}
                 </select>
               </div>
@@ -704,12 +651,7 @@ function App() {
               </div>
               <div className="mb-2">
                 <label className="block font-semibold">Cargo/Departamento:</label>
-                <select
-                  value={cargoDepartamento}
-                  onChange={handleCargoChange}
-                  required
-                  className="border rounded px-2 py-1 w-full"
-                >
+                <select value={cargoDepartamento} onChange={handleCargoChange} required className="border rounded px-2 py-1 w-full">
                   <option value="">Selecione</option>
                   {cargoOptions.map((option, idx) => (
                     <option key={idx} value={option}>
@@ -730,12 +672,7 @@ function App() {
               </div>
               <div className="mb-2">
                 <label className="block font-semibold">Categoria:</label>
-                <select
-                  value={categoria}
-                  onChange={handleCategoryChange}
-                  required
-                  className="border rounded px-2 py-1 w-full"
-                >
+                <select value={categoria} onChange={handleCategoryChange} required className="border rounded px-2 py-1 w-full">
                   <option value="">Selecione</option>
                   {categoryOptions.map((option, idx) => (
                     <option key={idx} value={option}>
@@ -746,12 +683,7 @@ function App() {
               </div>
               <div className="mb-2">
                 <label className="block font-semibold">Prioridade:</label>
-                <select
-                  value={prioridade}
-                  onChange={(e) => setPrioridade(e.target.value)}
-                  required
-                  className="border rounded px-2 py-1 w-full"
-                >
+                <select value={prioridade} onChange={(e) => setPrioridade(e.target.value)} required className="border rounded px-2 py-1 w-full">
                   <option value="">Selecione</option>
                   {priorityOptions.map((option, idx) => (
                     <option key={idx} value={option}>
@@ -762,26 +694,13 @@ function App() {
               </div>
               <div className="mb-2">
                 <label className="block font-semibold">Anexar documentos/evidências:</label>
-                <input
-                  type="file"
-                  multiple
-                  onChange={handleTicketFileChange}
-                  className="w-full"
-                />
+                <input type="file" multiple onChange={handleTicketFileChange} className="w-full" />
               </div>
               <div className="flex justify-end gap-2 mt-4">
-                <button
-                  type="button"
-                  onClick={() => setShowNewTicketForm(false)}
-                  className="px-3 py-1 bg-gray-300 rounded"
-                >
+                <button type="button" onClick={() => setShowNewTicketForm(false)} className="px-3 py-1 bg-gray-300 rounded">
                   Cancelar
                 </button>
-                <button
-                  type="submit"
-                  className="px-3 py-1 rounded"
-                  style={{ backgroundColor: "#0E1428", color: "white" }}
-                >
+                <button type="submit" className="px-3 py-1 rounded" style={{ backgroundColor: "#0E1428", color: "white" }}>
                   Criar Chamado
                 </button>
               </div>
@@ -790,16 +709,12 @@ function App() {
 
           <div className="grid gap-4 w-full max-w-5xl mx-auto">
             {tabFilteredTickets.map((ticket) => {
-              const isExpired =
-                ticket.status !== "Concluído" &&
-                new Date() > new Date(ticket.prazoFinalizacao);
+              const isExpired = ticket.status !== "Concluído" && new Date() > new Date(ticket.prazoFinalizacao);
               return (
                 <motion.div
                   key={ticket.id}
                   className="relative shadow p-4 rounded-2xl"
-                  style={{
-                    backgroundColor: isExpired ? "#ffe6e6" : "white",
-                  }}
+                  style={{ backgroundColor: isExpired ? "#ffe6e6" : "white" }}
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.3 }}
@@ -813,12 +728,10 @@ function App() {
                       </h2>
                       <p className="text-gray-700">
                         <span className="font-semibold">Categoria:</span> {ticket.categoria} |{" "}
-                        <span className="font-semibold">Prioridade:</span>{" "}
-                        {ticket.prioridade}
+                        <span className="font-semibold">Prioridade:</span> {ticket.prioridade}
                       </p>
                       <p className="text-gray-700">
-                        <span className="font-semibold">Data de Abertura:</span>{" "}
-                        {ticket.dataDeAbertura}
+                        <span className="font-semibold">Data de Abertura:</span> {ticket.dataDeAbertura}
                       </p>
                       <p className="text-gray-700">
                         <span className="font-semibold">Prazo Final:</span>{" "}
@@ -827,8 +740,7 @@ function App() {
                       {ticket.status === "Concluído" && (
                         <>
                           <p className="text-gray-700">
-                            <span className="font-semibold">Data de Resolução:</span>{" "}
-                            {ticket.dataResolucao}
+                            <span className="font-semibold">Data de Resolução:</span> {ticket.dataResolucao}
                           </p>
                           <p className="text-gray-700">
                             <span className="font-semibold">SLA:</span> {ticket.sla}
@@ -844,9 +756,7 @@ function App() {
                         }}
                         className="px-2 py-1 bg-gray-300 rounded"
                       >
-                        {expandedTickets[ticket.id]
-                          ? "Ocultar"
-                          : "Ver Detalhes"}
+                        {expandedTickets[ticket.id] ? "Ocultar" : "Ver Detalhes"}
                       </button>
                       {currentUser.isAdmin && (
                         <button
@@ -857,11 +767,7 @@ function App() {
                           className="p-1"
                           title="Excluir chamado"
                         >
-                          <img
-                            src="/trash-icon.png"
-                            alt="Excluir chamado"
-                            className="w-6 h-6"
-                          />
+                          <img src="/trash-icon.png" alt="Excluir chamado" className="w-6 h-6" />
                         </button>
                       )}
                     </div>
@@ -870,17 +776,14 @@ function App() {
                     <div className="mt-4">
                       {!currentUser.isAdmin && (
                         <p className="text-gray-700 mb-1">
-                          <span className="font-semibold">Nome do Solicitante:</span>{" "}
-                          {ticket.nomeSolicitante}
+                          <span className="font-semibold">Nome do Solicitante:</span> {ticket.nomeSolicitante}
                         </p>
                       )}
                       <p className="text-gray-700 mb-1">
-                        <span className="font-semibold">Cargo/Departamento:</span>{" "}
-                        {ticket.cargoDepartamento}
+                        <span className="font-semibold">Cargo/Departamento:</span> {ticket.cargoDepartamento}
                       </p>
                       <p className="text-gray-700 mb-1 whitespace-pre-wrap">
-                        <span className="font-semibold">Descrição:</span>{" "}
-                        {ticket.descricaoProblema}
+                        <span className="font-semibold">Descrição:</span> {ticket.descricaoProblema}
                       </p>
                       {currentUser.isAdmin && (
                         <div className="mb-2">
@@ -890,9 +793,7 @@ function App() {
                           ) : (
                             <select
                               value={adminEdits[ticket.id]?.status ?? ticket.status}
-                              onChange={(e) =>
-                                handleAdminEdit(ticket.id, "status", e.target.value)
-                              }
+                              onChange={(e) => handleAdminEdit(ticket.id, "status", e.target.value)}
                               className="border rounded px-2 py-1 ml-1"
                             >
                               {statusOptions.map((option, idx) => (
@@ -908,15 +809,11 @@ function App() {
                         <div className="mb-2">
                           <label className="font-semibold">Atendente:</label>{" "}
                           {ticket.status === "Concluído" ? (
-                            <span className="ml-1">
-                              {ticket.responsavel || "Não definido"}
-                            </span>
+                            <span className="ml-1">{ticket.responsavel || "Não definido"}</span>
                           ) : (
                             <select
                               value={adminEdits[ticket.id]?.responsavel ?? ticket.responsavel}
-                              onChange={(e) =>
-                                handleAdminEdit(ticket.id, "responsavel", e.target.value)
-                              }
+                              onChange={(e) => handleAdminEdit(ticket.id, "responsavel", e.target.value)}
                               className="border rounded px-2 py-1 ml-1"
                             >
                               <option value="">Selecione</option>
@@ -937,9 +834,7 @@ function App() {
                       )}
                       <hr />
                       <div className="mb-2">
-                        <p className="text-gray-700 font-semibold">
-                          Comentários/Atualizações:
-                        </p>
+                        <p className="text-gray-700 font-semibold">Comentários/Atualizações:</p>
                         {ticket.comentarios.map((cmt, idx) => (
                           <div key={idx} className="bg-gray-100 p-2 rounded-lg mb-2">
                             <p className="text-sm whitespace-pre-wrap">
