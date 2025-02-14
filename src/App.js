@@ -439,13 +439,11 @@ function App() {
   const visibleTickets = !currentUser 
     ? [] 
     : tickets.filter(ticket => {
-        // Aqui, admin vê todos
-        return ticket.emailSolicitante === currentUser.email || 
-               ["jonathan.kauer@guiainvest.com.br", "nayla.martins@guiainvest.com.br"]
-                .includes(currentUser.email.toLowerCase());
+        return ticket.emailSolicitante === currentUser.email ||
+               ["jonathan.kauer@guiainvest.com.br", "nayla.martins@guiainvest.com.br"].includes(currentUser.email.toLowerCase());
       });
 
-  // Filtra pela aba ativa (para admin, simplificado)
+  // Filtra pela aba ativa
   const tabFilteredTickets = visibleTickets.filter(ticket => {
     return activeTab === "open" 
       ? ticket.status !== "Concluído" 
@@ -461,9 +459,6 @@ function App() {
     }
     const adminEmails = ["jonathan.kauer@guiainvest.com.br", "nayla.martins@guiainvest.com.br"];
     if (adminEmails.includes(loginEmail.toLowerCase())) {
-      // Se for admin, verifica duas possibilidades:
-      // 1. A senha de admin, definida no código ("admin123@guiainvestgpt")
-      // 2. A senha do ambiente usuário (armazenada no localStorage)
       if (loginPassword === "admin123@guiainvestgpt") {
         setCurrentUser({ email: loginEmail });
         setLoginEmail("");
@@ -487,7 +482,6 @@ function App() {
         return;
       }
     } else {
-      // Para usuários não-admin
       const users = JSON.parse(localStorage.getItem("users") || "{}");
       if (users[loginEmail]) {
         if (users[loginEmail] !== loginPassword) {
@@ -530,8 +524,8 @@ function App() {
       )}
 
       {/* Cabeçalho Centralizado */}
-      <div className="flex flex-col items-center mb-4">
-        <img src="/logo.png" alt="FinDesk Logo" className="h-12" />
+      <div className="flex flex-col items-center mb-6">
+        <img src="/logo.png" alt="FinDesk Logo" className="h-12 mb-4" />
         <motion.h1 className="text-3xl font-bold" initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }}>
           FinDesk
         </motion.h1>
@@ -576,7 +570,7 @@ function App() {
       {/* Ambiente Logado */}
       {currentUser && (
         <>
-          {/* Menus de chamados */}
+          {/* Menus de Chamados Centralizados */}
           <div className="flex flex-col items-center mb-4">
             <div className="flex gap-4 mb-4">
               <button 
@@ -600,34 +594,33 @@ function App() {
                 Concluídos
               </button>
             </div>
-            {currentUser && (
-              <div className="flex flex-col sm:flex-row items-center gap-2">
-                <select value={adminFilterPriority} onChange={e => setAdminFilterPriority(e.target.value)} className="border rounded px-2 py-1">
-                  <option value="">Prioridade: Todas</option>
-                  {priorityOptions.map((p, idx) => (
-                    <option key={idx} value={p}>
-                      {p}
-                    </option>
-                  ))}
-                </select>
-                <select value={adminFilterCategory} onChange={e => setAdminFilterCategory(e.target.value)} className="border rounded px-2 py-1">
-                  <option value="">Categoria: Todas</option>
-                  {categoryOptions.filter(cat => cat !== "+Novo").map((cat, idx) => (
-                    <option key={idx} value={cat}>
-                      {cat}
-                    </option>
-                  ))}
-                </select>
-                <select value={adminFilterAtendente} onChange={e => setAdminFilterAtendente(e.target.value)} className="border rounded px-2 py-1">
-                  <option value="">Atendente: Todos</option>
-                  {atendenteOptions.map((opt, idx) => (
-                    <option key={idx} value={opt}>{opt}</option>
-                  ))}
-                </select>
-              </div>
-            )}
+            <div className="flex flex-col sm:flex-row items-center gap-2">
+              <select value={adminFilterPriority} onChange={e => setAdminFilterPriority(e.target.value)} className="border rounded px-2 py-1">
+                <option value="">Prioridade: Todas</option>
+                {priorityOptions.map((p, idx) => (
+                  <option key={idx} value={p}>
+                    {p}
+                  </option>
+                ))}
+              </select>
+              <select value={adminFilterCategory} onChange={e => setAdminFilterCategory(e.target.value)} className="border rounded px-2 py-1">
+                <option value="">Categoria: Todas</option>
+                {categoryOptions.filter(cat => cat !== "+Novo").map((cat, idx) => (
+                  <option key={idx} value={cat}>
+                    {cat}
+                  </option>
+                ))}
+              </select>
+              <select value={adminFilterAtendente} onChange={e => setAdminFilterAtendente(e.target.value)} className="border rounded px-2 py-1">
+                <option value="">Atendente: Todos</option>
+                {atendenteOptions.map((opt, idx) => (
+                  <option key={idx} value={opt}>{opt}</option>
+                ))}
+              </select>
+            </div>
           </div>
 
+          {/* Botão "Criar Novo Chamado" para Usuários (não Admin) */}
           {!(["jonathan.kauer@guiainvest.com.br", "nayla.martins@guiainvest.com.br"].includes(currentUser.email.toLowerCase())) && (
             <div className="mb-4 flex justify-center">
               <button onClick={() => setShowNewTicketForm(true)} className="px-3 py-1 rounded shadow" style={{ backgroundColor: "#FF5E00", color: "white" }}>
