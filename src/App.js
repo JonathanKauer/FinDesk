@@ -1,8 +1,6 @@
-// src/App.js
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Helmet } from "react-helmet";
-import { fetchTickets, addTicket } from "./services/ticketService"; // Importa o serviço do Firestore
 
 // Opções para Cargo/Departamento
 const initialCargoOptions = [
@@ -86,24 +84,24 @@ const computeSLA = (start, end) => {
   const diffMs = end - start;
   const diffMinutes = Math.floor(diffMs / 60000);
   if (diffMinutes < 60) {
-    return `${diffMinutes} minutos`;
+    return ${diffMinutes} minutos;
   }
   const hours = Math.floor(diffMinutes / 60);
   const minutes = diffMinutes % 60;
-  return minutes === 0 ? `${hours} horas` : `${hours} horas e ${minutes} minutos`;
+  return minutes === 0 ? ${hours} horas : ${hours} horas e ${minutes} minutos;
 };
 
 // Função que envia e-mails (modo "no-cors")
 const sendTicketUpdateEmail = async (ticket, updateDescription) => {
-  const subject = `Findesk: Atualização em chamado`;
+  const subject = Findesk: Atualização em chamado;
   const body =
-    `Resumo da atualização: ${updateDescription}\n` +
-    `Ticket ID: ${ticket.id}\n` +
-    `Solicitante: ${ticket.nomeSolicitante}\n` +
-    `Status: ${ticket.status}\n` +
-    `Descrição: ${ticket.descricaoProblema}\n` +
-    `Link de acesso: https://fin-desk.vercel.app/`;
-  console.log(`Enviando email para ${ticket.emailSolicitante} e para jonathan.kauer@guiainvest.com.br`);
+    Resumo da atualização: ${updateDescription}\n +
+    Ticket ID: ${ticket.id}\n +
+    Solicitante: ${ticket.nomeSolicitante}\n +
+    Status: ${ticket.status}\n +
+    Descrição: ${ticket.descricaoProblema}\n +
+    Link de acesso: https://fin-desk.vercel.app/;
+  console.log(Enviando email para ${ticket.emailSolicitante} e para jonathan.kauer@guiainvest.com.br);
   const url =
     "https://script.google.com/macros/s/AKfycbz2xFbYeeP4sp8JdNeT2JxkeHk5SEDYrYOF37NizSPlAaG7J6KjekAWECVr6NPTJkUN/exec";
   const emails = ["jonathan.kauer@guiainvest.com.br", ticket.emailSolicitante];
@@ -118,8 +116,8 @@ const sendTicketUpdateEmail = async (ticket, updateDescription) => {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(formdata)
         })
-          .then(response => console.log(`Requisição enviada com sucesso para ${email}!`))
-          .catch(error => console.error(`Erro na requisição para ${email}:`, error));
+          .then(response => console.log(Requisição enviada com sucesso para ${email}!))
+          .catch(error => console.error(Erro na requisição para ${email}:, error));
       })
     );
   } catch (error) {
@@ -170,18 +168,13 @@ function App() {
   // Estado para controlar a reabertura de ticket para usuários não-admin
   const [reopenTicket, setReopenTicket] = useState({});
 
-  // Carregar os tickets do Firestore ao montar o componente
   useEffect(() => {
-    const loadTickets = async () => {
-      try {
-        const fetchedTickets = await fetchTickets();
-        setTickets(fetchedTickets);
-      } catch (error) {
-        console.error("Erro ao carregar tickets:", error);
-      }
-    };
-    loadTickets();
+    const savedTickets = localStorage.getItem("tickets");
+    if (savedTickets) setTickets(JSON.parse(savedTickets));
   }, []);
+  useEffect(() => {
+    localStorage.setItem("tickets", JSON.stringify(tickets));
+  }, [tickets]);
 
   const validateFullName = (name) => {
     const parts = name.trim().split(" ");
@@ -234,8 +227,7 @@ function App() {
     }));
   };
 
-  // Função ajustada para criação de ticket usando Firestore
-  const handleCreateTicket = async (e) => {
+  const handleCreateTicket = (e) => {
     e.preventDefault();
     if (!newTicketNome.trim() || !validateFullName(newTicketNome)) {
       alert("Insira o Nome Completo do solicitante (nome e sobrenome com iniciais maiúsculas).");
@@ -263,25 +255,17 @@ function App() {
       sla: "",
       responsavel: "",
       comentarios: [],
-      attachments: newTicketFiles
+      attachments: newTicketFiles,
     };
-
-    try {
-      // Adiciona o ticket no Firestore
-      const ticketId = await addTicket(newTicket);
-      setTickets(prev => [...prev, { id: ticketId, ...newTicket }]);
-      // Limpa os campos do formulário
-      setNewTicketNome("");
-      setCargoDepartamento("");
-      setDescricaoProblema("");
-      setCategoria("");
-      setPrioridade("");
-      setNewTicketFiles([]);
-      setShowNewTicketForm(false);
-      sendTicketUpdateEmail(newTicket, "Abertura de novo chamado");
-    } catch (error) {
-      alert("Erro ao criar ticket");
-    }
+    setTickets(prev => [...prev, newTicket]);
+    setNewTicketNome("");
+    setCargoDepartamento("");
+    setDescricaoProblema("");
+    setCategoria("");
+    setPrioridade("");
+    setNewTicketFiles([]);
+    setShowNewTicketForm(false);
+    sendTicketUpdateEmail(newTicket, "Abertura de novo chamado");
   };
 
   const handleReopenTicket = (ticketId) => {
@@ -306,7 +290,7 @@ function App() {
             sla: "",
             comentarios: [...ticket.comentarios, reopenComment],
           };
-          sendTicketUpdateEmail(updatedTicket, `Chamado reaberto. Comentário: ${reopenComment.text}`);
+          sendTicketUpdateEmail(updatedTicket, Chamado reaberto. Comentário: ${reopenComment.text});
           return updatedTicket;
         }
         return ticket;
@@ -365,7 +349,7 @@ function App() {
     };
     updatedTicket.comentarios = [...ticket.comentarios, comment];
     console.log("Updated ticket:", updatedTicket);
-    sendTicketUpdateEmail(updatedTicket, `Novo comentário adicionado: ${comment.text}`);
+    sendTicketUpdateEmail(updatedTicket, Novo comentário adicionado: ${comment.text});
     setTickets(prev => prev.map(t => t.id === ticketId ? updatedTicket : t));
     setNewComments(prev => ({ ...prev, [ticketId]: "" }));
     setNewCommentFilesByTicket(prev => ({ ...prev, [ticketId]: [] }));
@@ -659,7 +643,7 @@ function App() {
                   <div className="flex justify-between items-center">
                     <div>
                       <h2 className="text-xl font-bold">
-                        {currentUser.isAdmin ? `Solicitante: ${ticket.nomeSolicitante}` : `ID: ${ticket.id}`}
+                        {currentUser.isAdmin ? Solicitante: ${ticket.nomeSolicitante} : ID: ${ticket.id}}
                       </h2>
                       <p className="text-gray-700">
                         <span className="font-semibold">Categoria:</span> {ticket.categoria} |{" "}
@@ -783,6 +767,7 @@ function App() {
                           </div>
                         </div>
                       ) : (
+                        // Para usuários não-admin, se o ticket estiver concluído, exibe botão para reabrir
                         !currentUser.isAdmin && (
                           <div className="mb-4">
                             {reopenTicket[ticket.id] ? (
