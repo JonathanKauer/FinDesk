@@ -135,7 +135,8 @@ const sendTicketUpdateEmail = async (ticket, updateDescription) => {
 
 function App() {
   // Estados de login (somente e-mail e senha)
-  const [currentUser, setCurrentUser] = useState(null); // objeto: { email }
+  // Agora, currentUser possui também uma flag "isAdmin" para diferenciar os ambientes.
+  const [currentUser, setCurrentUser] = useState(null); // objeto: { email, isAdmin }
   const [loginEmail, setLoginEmail] = useState("");
   const [loginPassword, setLoginPassword] = useState("");
 
@@ -460,7 +461,7 @@ function App() {
     const adminEmails = ["jonathan.kauer@guiainvest.com.br", "nayla.martins@guiainvest.com.br"];
     if (adminEmails.includes(loginEmail.toLowerCase())) {
       if (loginPassword === "admin123@guiainvestgpt") {
-        setCurrentUser({ email: loginEmail });
+        setCurrentUser({ email: loginEmail, isAdmin: true });
         setLoginEmail("");
         setLoginPassword("");
         return;
@@ -476,7 +477,7 @@ function App() {
           localStorage.setItem("users", JSON.stringify(users));
           alert("Senha cadastrada com sucesso!");
         }
-        setCurrentUser({ email: loginEmail });
+        setCurrentUser({ email: loginEmail, isAdmin: false });
         setLoginEmail("");
         setLoginPassword("");
         return;
@@ -493,10 +494,32 @@ function App() {
         localStorage.setItem("users", JSON.stringify(users));
         alert("Senha cadastrada com sucesso!");
       }
-      setCurrentUser({ email: loginEmail });
+      setCurrentUser({ email: loginEmail, isAdmin: false });
       setLoginEmail("");
       setLoginPassword("");
     }
+  };
+
+  // Handler para resetar a senha
+  const handleResetPassword = () => {
+    if (!loginEmail.trim()) {
+      alert("Por favor, insira seu e-mail para resetar a senha.");
+      return;
+    }
+    const newPass = prompt("Digite sua nova senha:");
+    if (!newPass || newPass.trim().length === 0) {
+      alert("Nova senha inválida!");
+      return;
+    }
+    const confirmPass = prompt("Confirme sua nova senha:");
+    if (newPass !== confirmPass) {
+      alert("As senhas não coincidem!");
+      return;
+    }
+    const users = JSON.parse(localStorage.getItem("users") || "{}");
+    users[loginEmail] = newPass;
+    localStorage.setItem("users", JSON.stringify(users));
+    alert("Senha resetada com sucesso! Agora use a nova senha para fazer login.");
   };
 
   const handleLogout = () => {
@@ -560,9 +583,14 @@ function App() {
                 No primeiro acesso, sua senha será cadastrada automaticamente.
               </small>
             </div>
-            <button type="submit" className="px-3 py-1 rounded shadow mt-4" style={{ backgroundColor: "#0E1428", color: "white" }}>
-              Entrar
-            </button>
+            <div className="flex justify-between mt-4">
+              <button type="submit" className="px-3 py-1 rounded shadow" style={{ backgroundColor: "#0E1428", color: "white" }}>
+                Entrar
+              </button>
+              <button type="button" onClick={handleResetPassword} className="px-3 py-1 rounded shadow" style={{ backgroundColor: "#FF5E00", color: "white" }}>
+                Reset de Senha
+              </button>
+            </div>
           </form>
         </div>
       )}
@@ -620,8 +648,8 @@ function App() {
             </div>
           </div>
 
-          {/* Botão "Criar Novo Chamado" para Usuários (não admin) */}
-          {!currentUser.isAdmin && !["jonathan.kauer@guiainvest.com.br", "nayla.martins@guiainvest.com.br"].includes(currentUser.email.toLowerCase()) && (
+          {/* Botão "Criar Novo Chamado" para Usuários (quando não está no ambiente admin) */}
+          {!currentUser.isAdmin && (
             <div className="mb-4 flex justify-center">
               <button onClick={() => setShowNewTicketForm(true)} className="px-3 py-1 rounded shadow" style={{ backgroundColor: "#FF5E00", color: "white" }}>
                 Criar Novo Chamado
