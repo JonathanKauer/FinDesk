@@ -524,8 +524,8 @@ function App() {
       )}
 
       {/* Cabeçalho Centralizado */}
-      <div className="flex flex-col items-center mb-6">
-        <img src="/logo.png" alt="FinDesk Logo" className="h-12 mb-4" />
+      <div className="flex flex-col items-center mb-4">
+        <img src="/logo.png" alt="FinDesk Logo" className="h-12 mb-2" />
         <motion.h1 className="text-3xl font-bold" initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }}>
           FinDesk
         </motion.h1>
@@ -533,7 +533,7 @@ function App() {
 
       {/* Tela de Login Centralizada */}
       {!currentUser && (
-        <div className="flex items-center justify-center min-h-screen">
+        <div className="flex items-center justify-center">
           <form onSubmit={handleLoginSubmit} className="bg-white shadow p-4 rounded-2xl w-full max-w-md">
             <h2 className="text-xl font-bold mb-4 text-center">Faça seu login</h2>
             <div className="mb-2">
@@ -620,8 +620,8 @@ function App() {
             </div>
           </div>
 
-          {/* Botão "Criar Novo Chamado" para Usuários (não Admin) */}
-          {!(["jonathan.kauer@guiainvest.com.br", "nayla.martins@guiainvest.com.br"].includes(currentUser.email.toLowerCase())) && (
+          {/* Botão "Criar Novo Chamado" para Usuários (não admin) */}
+          {!currentUser.isAdmin && !["jonathan.kauer@guiainvest.com.br", "nayla.martins@guiainvest.com.br"].includes(currentUser.email.toLowerCase()) && (
             <div className="mb-4 flex justify-center">
               <button onClick={() => setShowNewTicketForm(true)} className="px-3 py-1 rounded shadow" style={{ backgroundColor: "#FF5E00", color: "white" }}>
                 Criar Novo Chamado
