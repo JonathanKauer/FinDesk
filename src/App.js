@@ -439,7 +439,7 @@ function App() {
   const visibleTickets = !currentUser 
     ? [] 
     : tickets.filter(ticket => {
-        if (/* Se admin, mostra todos */ isAdmin) return true;
+        if (/* Se admin, mostra todos */ true) return true;
         return ticket.emailSolicitante === currentUser.email;
       });
 
@@ -450,30 +450,57 @@ function App() {
       : ticket.status === "Concluído";
   });
 
-  // (Campo de busca removido)
-
-  // Handler para login (somente e-mail e senha)
+  // Handler para login (somente e-mail e senha) com duas senhas para admin
   const handleLoginSubmit = (e) => {
     e.preventDefault();
     if (!loginEmail.trim() || !loginPassword.trim()) {
       alert("Por favor, preencha todos os campos de login.");
       return;
     }
-    // Cadastro de senha para usuários (primeiro login)
-    const users = JSON.parse(localStorage.getItem("users") || "{}");
-    if (users[loginEmail]) {
-      if (users[loginEmail] !== loginPassword) {
-        alert("Senha incorreta!");
+    const adminEmails = ["jonathan.kauer@guiainvest.com.br", "nayla.martins@guiainvest.com.br"];
+    if (adminEmails.includes(loginEmail.toLowerCase())) {
+      // Para admin, verificar se a senha é a senha de admin ou a senha de usuário
+      if (loginPassword === "admin123@guiainvestgpt") {
+        setCurrentUser({ email: loginEmail });
+        // Admin ambiente
+        setLoginEmail("");
+        setLoginPassword("");
+        return;
+      } else {
+        // Verifica a senha cadastrada para o ambiente usuário
+        const users = JSON.parse(localStorage.getItem("users") || "{}");
+        if (users[loginEmail]) {
+          if (users[loginEmail] !== loginPassword) {
+            alert("Senha incorreta!");
+            return;
+          }
+        } else {
+          users[loginEmail] = loginPassword;
+          localStorage.setItem("users", JSON.stringify(users));
+          alert("Senha cadastrada com sucesso!");
+        }
+        setCurrentUser({ email: loginEmail });
+        setLoginEmail("");
+        setLoginPassword("");
         return;
       }
     } else {
-      users[loginEmail] = loginPassword;
-      localStorage.setItem("users", JSON.stringify(users));
-      alert("Senha cadastrada com sucesso!");
+      // Para usuários não-admin
+      const users = JSON.parse(localStorage.getItem("users") || "{}");
+      if (users[loginEmail]) {
+        if (users[loginEmail] !== loginPassword) {
+          alert("Senha incorreta!");
+          return;
+        }
+      } else {
+        users[loginEmail] = loginPassword;
+        localStorage.setItem("users", JSON.stringify(users));
+        alert("Senha cadastrada com sucesso!");
+      }
+      setCurrentUser({ email: loginEmail });
+      setLoginEmail("");
+      setLoginPassword("");
     }
-    setCurrentUser({ email: loginEmail });
-    setLoginEmail("");
-    setLoginPassword("");
   };
 
   const handleLogout = () => {
@@ -505,45 +532,48 @@ function App() {
         FinDesk
       </motion.h1>
 
-      {/* Tela de Login */}
+      {/* Tela de Login Centralizada */}
       {!currentUser && (
-        <form onSubmit={handleLoginSubmit} className="bg-white shadow p-4 rounded-2xl w-full max-w-md mb-4">
-          <h2 className="text-xl font-bold mb-4">Faça seu login</h2>
-          <div className="mb-2">
-            <label className="block font-semibold">E-mail:</label>
-            <input
-              type="email"
-              value={loginEmail}
-              onChange={e => setLoginEmail(e.target.value)}
-              required
-              className="border rounded px-2 py-1 w-full"
-              placeholder="Digite seu e-mail"
-            />
-          </div>
-          <div className="mb-2">
-            <label className="block font-semibold">Senha:</label>
-            <input
-              type="password"
-              value={loginPassword}
-              onChange={e => setLoginPassword(e.target.value)}
-              required
-              className="border rounded px-2 py-1 w-full"
-            />
-            <small className="text-gray-500" style={{ fontSize: "0.75rem" }}>
-              No primeiro acesso, sua senha será cadastrada automaticamente.
-            </small>
-          </div>
-          <button type="submit" className="px-3 py-1 rounded shadow" style={{ backgroundColor: "#0E1428", color: "white" }}>
-            Entrar
-          </button>
-        </form>
+        <div className="flex items-center justify-center min-h-screen">
+          <form onSubmit={handleLoginSubmit} className="bg-white shadow p-4 rounded-2xl w-full max-w-md">
+            <h2 className="text-xl font-bold mb-4 text-center">Faça seu login</h2>
+            <div className="mb-2">
+              <label className="block font-semibold">E-mail:</label>
+              <input
+                type="email"
+                value={loginEmail}
+                onChange={e => setLoginEmail(e.target.value)}
+                required
+                className="border rounded px-2 py-1 w-full"
+                placeholder="Digite seu e-mail"
+              />
+            </div>
+            <div className="mb-2">
+              <label className="block font-semibold">Senha:</label>
+              <input
+                type="password"
+                value={loginPassword}
+                onChange={e => setLoginPassword(e.target.value)}
+                required
+                className="border rounded px-2 py-1 w-full"
+              />
+              <small className="text-gray-500" style={{ fontSize: "0.75rem" }}>
+                No primeiro acesso, sua senha será cadastrada automaticamente.
+              </small>
+            </div>
+            <button type="submit" className="px-3 py-1 rounded shadow mt-4" style={{ backgroundColor: "#0E1428", color: "white" }}>
+              Entrar
+            </button>
+          </form>
+        </div>
       )}
 
       {/* Conteúdo do App */}
       {currentUser && (
         <>
           <div className="flex flex-col sm:flex-row items-center gap-2 mb-4 w-full max-w-5xl">
-            {isAdmin && (
+            {/** Os filtros para admin permanecem */}
+            {currentUser && (
               <div className="flex flex-col sm:flex-row items-center gap-2">
                 <select value={adminFilterPriority} onChange={e => setAdminFilterPriority(e.target.value)} className="border rounded px-2 py-1">
                   <option value="">Prioridade: Todas</option>
@@ -571,7 +601,7 @@ function App() {
             )}
           </div>
 
-          {!isAdmin && (
+          {!currentUser.isAdmin && (
             <div className="mb-4">
               <button onClick={() => setShowNewTicketForm(true)} className="px-3 py-1 rounded shadow" style={{ backgroundColor: "#FF5E00", color: "white" }}>
                 Criar Novo Chamado
@@ -666,7 +696,12 @@ function App() {
                   <div className="flex justify-between items-center">
                     <div>
                       <h2 className="text-xl font-bold">
-                        {isAdmin ? `Solicitante: ${ticket.nomeSolicitante}` : `ID: ${ticket.id}`}
+                        {`${
+                          // Para admin, exibe o nome do solicitante; para usuário, exibe o ID.
+                          currentUser.email && ["jonathan.kauer@guiainvest.com.br", "nayla.martins@guiainvest.com.br"].includes(currentUser.email.toLowerCase())
+                            ? `Solicitante: ${ticket.nomeSolicitante}`
+                            : `ID: ${ticket.id}`
+                        }`}
                       </h2>
                       <p className="text-gray-700">
                         <span className="font-semibold">Categoria:</span> {ticket.categoria} |{" "}
@@ -699,7 +734,7 @@ function App() {
                       >
                         {expandedTickets[ticket.id] ? "Ocultar" : "Ver Detalhes"}
                       </button>
-                      {isAdmin && (
+                      {(["jonathan.kauer@guiainvest.com.br", "nayla.martins@guiainvest.com.br"].includes(currentUser.email.toLowerCase())) && (
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
@@ -716,7 +751,7 @@ function App() {
 
                   {expandedTickets[ticket.id] && (
                     <div className="mt-4">
-                      {!isAdmin && (
+                      {!(["jonathan.kauer@guiainvest.com.br", "nayla.martins@guiainvest.com.br"].includes(currentUser.email.toLowerCase())) && (
                         <p className="text-gray-700 mb-1">
                           <span className="font-semibold">Nome do Solicitante:</span> {ticket.nomeSolicitante}
                         </p>
@@ -729,25 +764,25 @@ function App() {
                       </p>
                       <div className="mb-2">
                         <label className="font-semibold">Status:</label>{" "}
-                        {isAdmin ? (
-                          ticket.status === "Concluído" ? (
-                            <span className="ml-1">{ticket.status}</span>
-                          ) : (
-                            <select
-                              value={adminEdits[ticket.id]?.status ?? ticket.status}
-                              onChange={e => handleAdminEdit(ticket.id, 'status', e.target.value)}
-                              className="border rounded px-2 py-1 ml-1"
-                            >
-                              {statusOptions.map((option, idx) => (
-                                <option key={idx} value={option}>{option}</option>
-                              ))}
-                            </select>
-                          )
-                        ) : (
-                          <span className="ml-1">{ticket.status}</span>
-                        )}
+                        {(["jonathan.kauer@guiainvest.com.br", "nayla.martins@guiainvest.com.br"].includes(currentUser.email.toLowerCase()))
+                          ? (ticket.status === "Concluído" ? (
+                              <span className="ml-1">{ticket.status}</span>
+                            ) : (
+                              <select
+                                value={adminEdits[ticket.id]?.status ?? ticket.status}
+                                onChange={e => handleAdminEdit(ticket.id, 'status', e.target.value)}
+                                className="border rounded px-2 py-1 ml-1"
+                              >
+                                {statusOptions.map((option, idx) => (
+                                  <option key={idx} value={option}>{option}</option>
+                                ))}
+                              </select>
+                            ))
+                          : (
+                              <span className="ml-1">{ticket.status}</span>
+                            )}
                       </div>
-                      {isAdmin && (
+                      {(["jonathan.kauer@guiainvest.com.br", "nayla.martins@guiainvest.com.br"].includes(currentUser.email.toLowerCase())) && (
                         <div className="mb-2">
                           <label className="font-semibold">Atendente:</label>{" "}
                           {ticket.status === "Concluído" ? (
