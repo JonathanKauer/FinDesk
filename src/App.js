@@ -275,8 +275,8 @@ function App() {
       prazoFinalizacao,
       status: "Aberto",
       dataResolucao: "",
-      sla: "", // Será calculado quando concluído
-      responsavel: "", // campo para o atendente (definido pelo admin)
+      sla: "",
+      responsavel: "",
       comentarios: [],
       attachments: newTicketFiles,
     };
@@ -439,8 +439,10 @@ function App() {
   const visibleTickets = !currentUser 
     ? [] 
     : tickets.filter(ticket => {
-        if (/* Se admin, mostra todos */ true) return true;
-        return ticket.emailSolicitante === currentUser.email;
+        // Aqui, admin vê todos
+        return ticket.emailSolicitante === currentUser.email || 
+               ["jonathan.kauer@guiainvest.com.br", "nayla.martins@guiainvest.com.br"]
+                .includes(currentUser.email.toLowerCase());
       });
 
   // Filtra pela aba ativa (para admin, simplificado)
@@ -450,7 +452,7 @@ function App() {
       : ticket.status === "Concluído";
   });
 
-  // Handler para login (somente e-mail e senha) com duas senhas para admin
+  // Handler para login com duas senhas para admin
   const handleLoginSubmit = (e) => {
     e.preventDefault();
     if (!loginEmail.trim() || !loginPassword.trim()) {
@@ -459,15 +461,15 @@ function App() {
     }
     const adminEmails = ["jonathan.kauer@guiainvest.com.br", "nayla.martins@guiainvest.com.br"];
     if (adminEmails.includes(loginEmail.toLowerCase())) {
-      // Para admin, verificar se a senha é a senha de admin ou a senha de usuário
+      // Se for admin, verifica duas possibilidades:
+      // 1. A senha de admin, definida no código ("admin123@guiainvestgpt")
+      // 2. A senha do ambiente usuário (armazenada no localStorage)
       if (loginPassword === "admin123@guiainvestgpt") {
         setCurrentUser({ email: loginEmail });
-        // Admin ambiente
         setLoginEmail("");
         setLoginPassword("");
         return;
       } else {
-        // Verifica a senha cadastrada para o ambiente usuário
         const users = JSON.parse(localStorage.getItem("users") || "{}");
         if (users[loginEmail]) {
           if (users[loginEmail] !== loginPassword) {
@@ -527,10 +529,13 @@ function App() {
         </div>
       )}
 
-      <img src="/logo.png" alt="FinDesk Logo" className="h-12 mb-4" />
-      <motion.h1 className="text-3xl font-bold mb-4" initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }}>
-        FinDesk
-      </motion.h1>
+      {/* Cabeçalho Centralizado */}
+      <div className="flex flex-col items-center mb-4">
+        <img src="/logo.png" alt="FinDesk Logo" className="h-12" />
+        <motion.h1 className="text-3xl font-bold" initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }}>
+          FinDesk
+        </motion.h1>
+      </div>
 
       {/* Tela de Login Centralizada */}
       {!currentUser && (
@@ -568,11 +573,33 @@ function App() {
         </div>
       )}
 
-      {/* Conteúdo do App */}
+      {/* Ambiente Logado */}
       {currentUser && (
         <>
-          <div className="flex flex-col sm:flex-row items-center gap-2 mb-4 w-full max-w-5xl">
-            {/** Os filtros para admin permanecem */}
+          {/* Menus de chamados */}
+          <div className="flex flex-col items-center mb-4">
+            <div className="flex gap-4 mb-4">
+              <button 
+                onClick={() => setActiveTab("open")} 
+                className="px-3 py-1 rounded" 
+                style={ activeTab === "open" 
+                  ? { backgroundColor: "#0E1428", color: "white" } 
+                  : { backgroundColor: "#f2f2f2", color: "#0E1428", border: "1px solid #0E1428" } 
+                }
+              >
+                Abertos e em andamento
+              </button>
+              <button 
+                onClick={() => setActiveTab("closed")} 
+                className="px-3 py-1 rounded" 
+                style={ activeTab === "closed" 
+                  ? { backgroundColor: "#0E1428", color: "white" } 
+                  : { backgroundColor: "#f2f2f2", color: "#0E1428", border: "1px solid #0E1428" } 
+                }
+              >
+                Concluídos
+              </button>
+            </div>
             {currentUser && (
               <div className="flex flex-col sm:flex-row items-center gap-2">
                 <select value={adminFilterPriority} onChange={e => setAdminFilterPriority(e.target.value)} className="border rounded px-2 py-1">
@@ -601,8 +628,8 @@ function App() {
             )}
           </div>
 
-          {!currentUser.isAdmin && (
-            <div className="mb-4">
+          {!(["jonathan.kauer@guiainvest.com.br", "nayla.martins@guiainvest.com.br"].includes(currentUser.email.toLowerCase())) && (
+            <div className="mb-4 flex justify-center">
               <button onClick={() => setShowNewTicketForm(true)} className="px-3 py-1 rounded shadow" style={{ backgroundColor: "#FF5E00", color: "white" }}>
                 Criar Novo Chamado
               </button>
@@ -611,7 +638,7 @@ function App() {
 
           {showNewTicketForm && (
             <motion.form
-              className="bg-white shadow p-4 rounded-2xl w-full max-w-lg mb-4"
+              className="bg-white shadow p-4 rounded-2xl w-full max-w-lg mx-auto mb-4"
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.3 }}
@@ -681,7 +708,7 @@ function App() {
             </motion.form>
           )}
 
-          <div className="grid gap-4 w-full max-w-5xl">
+          <div className="grid gap-4 w-full max-w-5xl mx-auto">
             {tabFilteredTickets.map(ticket => {
               const isExpired = ticket.status !== "Concluído" && new Date() > new Date(ticket.prazoFinalizacao);
               return (
@@ -696,12 +723,10 @@ function App() {
                   <div className="flex justify-between items-center">
                     <div>
                       <h2 className="text-xl font-bold">
-                        {`${
-                          // Para admin, exibe o nome do solicitante; para usuário, exibe o ID.
-                          currentUser.email && ["jonathan.kauer@guiainvest.com.br", "nayla.martins@guiainvest.com.br"].includes(currentUser.email.toLowerCase())
-                            ? `Solicitante: ${ticket.nomeSolicitante}`
-                            : `ID: ${ticket.id}`
-                        }`}
+                        {(["jonathan.kauer@guiainvest.com.br", "nayla.martins@guiainvest.com.br"].includes(currentUser.email.toLowerCase()))
+                          ? `Solicitante: ${ticket.nomeSolicitante}`
+                          : `ID: ${ticket.id}`
+                        }
                       </h2>
                       <p className="text-gray-700">
                         <span className="font-semibold">Categoria:</span> {ticket.categoria} |{" "}
