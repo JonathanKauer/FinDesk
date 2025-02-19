@@ -1,5 +1,5 @@
 import { collection, addDoc } from "firebase/firestore";
-import { db } from "./firebase-config";
+import { db } from "./firebase-config.js";
 
 async function adicionarRegistro(data) {
   try {
@@ -10,12 +10,10 @@ async function adicionarRegistro(data) {
   }
 }
 
-// Exemplo de dados a serem inseridos
 const dadosExemplo = {
   nome: "Conta Corrente",
   saldo: 1000,
   data: new Date()
 };
 
-// Chama a função para adicionar os dados
 adicionarRegistro(dadosExemplo);
