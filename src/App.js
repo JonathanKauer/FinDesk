@@ -4,6 +4,7 @@ import { motion } from 'framer-motion';
 import { Helmet } from "react-helmet";
 import { collection, addDoc } from 'firebase/firestore';
 import { db } from './firebase-config.js';
+import TicketList from './TicketList.js';
 
 // Opções para Cargo/Departamento
 const initialCargoOptions = [
@@ -343,7 +344,7 @@ function App() {
         }
       }
       if (adminEdits[ticketId].responsavel) {
-        updatedTicket.responsavel = adminEdits[ticketId].responsavel;
+        updatedTicket.responsavel = adminEdits[ticket.id]?.responsavel || ticket.responsavel;
       }
     }
     
@@ -633,6 +634,7 @@ function App() {
             </motion.form>
           )}
 
+          {/* Listagem de Tickets Locais (se ainda desejar manter essa visualização) */}
           <div className="grid gap-4 w-full max-w-5xl mx-auto">
             {tabFilteredTickets.map((ticket) => {
               const isExpired = ticket.status !== "Concluído" && new Date() > new Date(ticket.prazoFinalizacao);
@@ -791,6 +793,11 @@ function App() {
                 </motion.div>
               );
             })}
+          </div>
+
+          {/* Integração do TicketList para exibir tickets centralizados do Firestore */}
+          <div className="mt-8 w-full max-w-5xl mx-auto">
+            <TicketList />
           </div>
         </>
       )}
