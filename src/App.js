@@ -2,7 +2,9 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Helmet } from "react-helmet";
-import FinancasList from './FinancasList.js'; // Importa o componente FinancasList
+import FinancasList from './FinancasList.jsx';
+import { collection, addDoc } from 'firebase/firestore';
+import { db } from './firebase-config.js';
 
 // Opções para Cargo/Departamento
 const initialCargoOptions = [
@@ -136,7 +138,7 @@ function App() {
   const [tickets, setTickets] = useState([]);
   const [showNewTicketForm, setShowNewTicketForm] = useState(false);
 
-  // Armazenamento de data de abertura em dois formatos: ISO e display
+  // Campos para novo ticket
   const [newTicketNome, setNewTicketNome] = useState("");
   const [cargoDepartamento, setCargoDepartamento] = useState("");
   const [descricaoProblema, setDescricaoProblema] = useState("");
@@ -164,10 +166,8 @@ function App() {
   const [activeTab, setActiveTab] = useState("open");
   const [adminEdits, setAdminEdits] = useState({});
 
-  // Novo estado para avisos de comentário
+  // Estado para avisos de comentário e reabertura de tickets
   const [commentWarnings, setCommentWarnings] = useState({});
-
-  // Estado para controlar a reabertura de ticket para usuários não-admin
   const [reopenTicket, setReopenTicket] = useState({});
 
   useEffect(() => {
@@ -229,7 +229,7 @@ function App() {
     }));
   };
 
-  const handleCreateTicket = (e) => {
+  const handleCreateTicket = async (e) => {
     e.preventDefault();
     if (!newTicketNome.trim() || !validateFullName(newTicketNome)) {
       alert("Insira o Nome Completo do solicitante (nome e sobrenome com iniciais maiúsculas).");
@@ -241,6 +241,7 @@ function App() {
     const daysToAdd = priorityDaysMapping[prioridade] || 0;
     const prazoFinalizacaoDate = addBusinessDays(dataDeAbertura, daysToAdd);
     const prazoFinalizacao = prazoFinalizacaoDate.toISOString();
+    
     const newTicket = {
       id: generateTicketId(),
       nomeSolicitante: newTicketNome,
@@ -259,6 +260,8 @@ function App() {
       comentarios: [],
       attachments: newTicketFiles,
     };
+    
+    // Atualiza o estado e localStorage
     setTickets(prev => [...prev, newTicket]);
     setNewTicketNome("");
     setCargoDepartamento("");
@@ -267,6 +270,16 @@ function App() {
     setPrioridade("");
     setNewTicketFiles([]);
     setShowNewTicketForm(false);
+    
+    // Envia o ticket para o Firestore (coleção "tickets")
+    try {
+      await addDoc(collection(db, 'tickets'), newTicket);
+      console.log("Ticket salvo no Firestore com sucesso!");
+    } catch (error) {
+      console.error("Erro ao salvar ticket no Firestore:", error);
+    }
+    
+    // Envia o e-mail de notificação
     sendTicketUpdateEmail(newTicket, "Abertura de novo chamado");
   };
 
@@ -304,17 +317,12 @@ function App() {
   };
 
   const handleAddComment = (ticketId) => {
-    console.log("handleAddComment called for ticket:", ticketId);
     const commentText = newComments[ticketId];
-    if (!commentText || commentText.trim() === "") {
-      console.log("Comentário vazio, abortando.");
-      return;
-    }
+    if (!commentText || commentText.trim() === "") return;
+    
     const ticket = tickets.find(t => t.id === ticketId);
-    if (!ticket) {
-      console.log("Chamado não encontrado.");
-      return;
-    }
+    if (!ticket) return;
+    
     if (currentUser.isAdmin && adminEdits[ticketId]?.status === "Concluído" && (!commentText || commentText.trim() === "")) {
       setCommentWarnings(prev => ({ ...prev, [ticketId]: "É necessário adicionar um comentário antes de concluir o chamado." }));
       return;
@@ -325,6 +333,7 @@ function App() {
         return newWarnings;
       });
     }
+    
     let updatedTicket = { ...ticket };
     if (currentUser.isAdmin && adminEdits[ticketId]) {
       if (adminEdits[ticketId].status) {
@@ -338,14 +347,15 @@ function App() {
         updatedTicket.responsavel = adminEdits[ticketId].responsavel;
       }
     }
+    
     const comment = {
       text: commentText,
       user: currentUser.isAdmin ? ("Admin: " + (ticket.responsavel || "")) : ticket.nomeSolicitante,
       timestamp: new Date().toLocaleString(),
       attachments: newCommentFilesByTicket[ticketId] || []
     };
+    
     updatedTicket.comentarios = [...ticket.comentarios, comment];
-    console.log("Updated ticket:", updatedTicket);
     sendTicketUpdateEmail(updatedTicket, `Novo comentário adicionado: ${comment.text}`);
     setTickets(prev => prev.map(t => t.id === ticketId ? updatedTicket : t));
     setNewComments(prev => ({ ...prev, [ticketId]: "" }));
@@ -784,7 +794,7 @@ function App() {
             })}
           </div>
 
-          {/* Integração do componente FinancasList */}
+          {/* Seção de Registros de Finanças */}
           <div className="mt-8 w-full max-w-5xl mx-auto">
             <h2 className="text-2xl font-bold mb-4">Registros de Finanças</h2>
             <FinancasList />
