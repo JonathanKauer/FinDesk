@@ -67,18 +67,21 @@ async function sendTicketUpdateEmail(ticket, updateDescription) {
   console.log(`Enviando email para ${ticket.emailSolicitante} e para jonathan.kauer@guiainvest.com.br`);
   const url = "https://script.google.com/macros/s/AKfycbz2xFbYeeP4sp8JdNeT2JxkeHk5SEDYrYOF37NizSPlAaG7J6KjekAWECVr6NPTJkUN/exec";
   const emails = ["jonathan.kauer@guiainvest.com.br", ticket.emailSolicitante];
+  
   try {
-    await Promise.all(emails.map(email => {
-      const formdata = { email, subject, message: body };
-      return fetch(url, {
-        method: "POST",
-        mode: "no-cors",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(formdata)
+    await Promise.all(
+      emails.map(email => {
+        const formdata = { email, subject, message: body };
+        return fetch(url, {
+          method: "POST",
+          mode: "no-cors",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(formdata)
+        })
+          .then(() => console.log(`Email enviado para ${email}!`))
+          .catch(error => console.error(`Erro no envio para ${email}:`, error));
       })
-        .then(() => console.log(`Email enviado para ${email}!`))
-        .catch(err => console.error(`Erro no envio para ${email}:`, err));
-    }));
+    );
   } catch (error) {
     console.error("Erro ao enviar e-mails:", error);
   }
@@ -89,16 +92,17 @@ function App() {
   const [currentUser, setCurrentUser] = useState(null);
   const [loginEmail, setLoginEmail] = useState("");
   const [loginPassword, setLoginPassword] = useState("");
-
-  // Estado do formulário de novo chamado
+  
   const [showNewTicketForm, setShowNewTicketForm] = useState(false);
+  
+  // Campos para novo ticket
   const [newTicketNome, setNewTicketNome] = useState("");
   const [cargoDepartamento, setCargoDepartamento] = useState("");
   const [descricaoProblema, setDescricaoProblema] = useState("");
   const [categoria, setCategoria] = useState("");
   const [prioridade, setPrioridade] = useState("");
   const [newTicketFiles, setNewTicketFiles] = useState([]);
-
+  
   const [cargoOptions, setCargoOptions] = useState(initialCargoOptions);
   const [categoryOptions, setCategoryOptions] = useState([
     "Clientes",
@@ -106,7 +110,7 @@ function App() {
     "Basement",
     "+Novo"
   ]);
-
+  
   // Lógica de login
   const handleLoginSubmit = (e) => {
     e.preventDefault();
@@ -114,22 +118,21 @@ function App() {
       alert("Preencha todos os campos de login.");
       return;
     }
-    // Lista de emails admin
     const adminEmails = ["jonathan.kauer@guiainvest.com.br", "nayla.martins@guiainvest.com.br"];
-    // Se o email é admin, verificamos a senha; se não for, trata como usuário comum.
     let isAdmin = false;
     if (adminEmails.includes(loginEmail.toLowerCase())) {
-      // Se o usuário digitar a senha de admin, ele é admin; caso contrário, será usuário comum.
       if (loginPassword === "admin123@guiainvestgpt") {
         isAdmin = true;
+      } else {
+        alert("Senha de admin incorreta. Você será logado como usuário comum.");
       }
     }
     setCurrentUser({ email: loginEmail, isAdmin });
     setLoginEmail("");
     setLoginPassword("");
   };
-
-  // Função para criar ticket e salvar no Firestore
+  
+  // Criação de ticket no Firestore
   const handleCreateTicket = async (e) => {
     e.preventDefault();
     if (!newTicketNome.trim()) {
@@ -142,6 +145,7 @@ function App() {
     const daysToAdd = priorityDaysMapping[prioridade] || 0;
     const prazoFinalizacaoDate = addBusinessDays(dataDeAbertura, daysToAdd);
     const prazoFinalizacao = prazoFinalizacaoDate.toISOString();
+    
     const newTicket = {
       id: generateTicketId(),
       nomeSolicitante: newTicketNome,
@@ -160,6 +164,7 @@ function App() {
       comentarios: [],
       attachments: newTicketFiles,
     };
+    
     try {
       await addDoc(collection(db, 'tickets'), newTicket);
       console.log("Ticket salvo no Firestore!");
@@ -167,7 +172,8 @@ function App() {
     } catch (error) {
       console.error("Erro ao salvar ticket:", error);
     }
-    // Limpa o formulário e fecha a janela
+    
+    // Limpa o formulário
     setNewTicketNome("");
     setCargoDepartamento("");
     setDescricaoProblema("");
@@ -176,15 +182,15 @@ function App() {
     setNewTicketFiles([]);
     setShowNewTicketForm(false);
   };
-
+  
   const handleTicketFileChange = (e) => {
     setNewTicketFiles(Array.from(e.target.files));
   };
-
+  
   const handleLogout = () => {
     setCurrentUser(null);
   };
-
+  
   const handleResetPassword = () => {
     if (!loginEmail.trim()) {
       alert("Insira seu e-mail para redefinir a senha.");
@@ -202,7 +208,7 @@ function App() {
     }
     alert("Senha redefinida com sucesso!");
   };
-
+  
   if (!currentUser) {
     return (
       <div className="min-h-screen bg-gray-100 flex items-center justify-center">
@@ -236,7 +242,11 @@ function App() {
             </small>
           </div>
           <div className="flex justify-end mt-4">
-            <button type="submit" className="px-3 py-1 rounded shadow" style={{ backgroundColor: "#0E1428", color: "white" }}>
+            <button
+              type="submit"
+              className="px-3 py-1 rounded shadow"
+              style={{ backgroundColor: "#0E1428", color: "white" }}
+            >
               Entrar
             </button>
           </div>
@@ -244,37 +254,49 @@ function App() {
       </div>
     );
   }
-
+  
   return (
     <div className="min-h-screen bg-gray-100 relative p-4" style={{ color: "#0E1428" }}>
       <Helmet>
         <title>FinDesk</title>
         <link rel="icon" href="/guiainvest-logo.png" />
       </Helmet>
-
-      {/* Cabeçalho com Logo e Título */}
-      <div className="flex flex-col items-center mb-4">
-        <img src="/logo.png" alt="FinDesk Logo" className="h-12 mb-2" />
-        <motion.h1 className="text-3xl font-bold" initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }}>
-          FinDesk
-        </motion.h1>
-      </div>
-
+      
       {/* Botão de Logout */}
       <div className="absolute top-4 right-4">
-        <button onClick={handleLogout} className="px-3 py-1 rounded shadow" style={{ backgroundColor: "#FF5E00", color: "white" }}>
+        <button
+          onClick={handleLogout}
+          className="px-3 py-1 rounded shadow"
+          style={{ backgroundColor: "#FF5E00", color: "white" }}
+        >
           Sair
         </button>
       </div>
-
+      
+      {/* Cabeçalho com Logo e Título */}
+      <div className="flex flex-col items-center mb-4">
+        <img src="/logo.png" alt="FinDesk Logo" className="h-12 mb-2" />
+        <motion.h1
+          className="text-3xl font-bold"
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+        >
+          FinDesk
+        </motion.h1>
+      </div>
+      
       {/* Botão para criar novo chamado */}
       <div className="flex justify-center mb-4">
-        <button onClick={() => setShowNewTicketForm(true)} className="px-3 py-1 rounded shadow" style={{ backgroundColor: "#FF5E00", color: "white" }}>
+        <button
+          onClick={() => setShowNewTicketForm(true)}
+          className="px-3 py-1 rounded shadow"
+          style={{ backgroundColor: "#FF5E00", color: "white" }}
+        >
           Criar Novo Chamado
         </button>
       </div>
-
-      {/* Formulário de criação de ticket */}
+      
+      {/* Formulário de criação de chamado */}
       {showNewTicketForm && (
         <motion.form
           className="bg-white shadow p-4 rounded-2xl w-full max-w-lg mx-auto mb-4"
@@ -373,10 +395,18 @@ function App() {
             <input type="file" multiple onChange={handleTicketFileChange} className="w-full" />
           </div>
           <div className="flex justify-end gap-2 mt-4">
-            <button type="button" onClick={() => setShowNewTicketForm(false)} className="px-3 py-1 bg-gray-300 rounded">
+            <button
+              type="button"
+              onClick={() => setShowNewTicketForm(false)}
+              className="px-3 py-1 bg-gray-300 rounded"
+            >
               Cancelar
             </button>
-            <button type="submit" className="px-3 py-1 rounded" style={{ backgroundColor: "#0E1428", color: "white" }}>
+            <button
+              type="submit"
+              className="px-3 py-1 rounded"
+              style={{ backgroundColor: "#0E1428", color: "white" }}
+            >
               Criar Chamado
             </button>
           </div>
