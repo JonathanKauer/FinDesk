@@ -1,6 +1,8 @@
+// src/App.js
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Helmet } from "react-helmet";
+import FinancasList from './FinancasList'; // Importa o componente FinancasList
 
 // Opções para Cargo/Departamento
 const initialCargoOptions = [
@@ -84,24 +86,24 @@ const computeSLA = (start, end) => {
   const diffMs = end - start;
   const diffMinutes = Math.floor(diffMs / 60000);
   if (diffMinutes < 60) {
-    return ${diffMinutes} minutos;
+    return `${diffMinutes} minutos`;
   }
   const hours = Math.floor(diffMinutes / 60);
   const minutes = diffMinutes % 60;
-  return minutes === 0 ? ${hours} horas : ${hours} horas e ${minutes} minutos;
+  return minutes === 0 ? `${hours} horas` : `${hours} horas e ${minutes} minutos`;
 };
 
 // Função que envia e-mails (modo "no-cors")
 const sendTicketUpdateEmail = async (ticket, updateDescription) => {
-  const subject = Findesk: Atualização em chamado;
+  const subject = "Findesk: Atualização em chamado";
   const body =
-    Resumo da atualização: ${updateDescription}\n +
-    Ticket ID: ${ticket.id}\n +
-    Solicitante: ${ticket.nomeSolicitante}\n +
-    Status: ${ticket.status}\n +
-    Descrição: ${ticket.descricaoProblema}\n +
-    Link de acesso: https://fin-desk.vercel.app/;
-  console.log(Enviando email para ${ticket.emailSolicitante} e para jonathan.kauer@guiainvest.com.br);
+    `Resumo da atualização: ${updateDescription}\n` +
+    `Ticket ID: ${ticket.id}\n` +
+    `Solicitante: ${ticket.nomeSolicitante}\n` +
+    `Status: ${ticket.status}\n` +
+    `Descrição: ${ticket.descricaoProblema}\n` +
+    `Link de acesso: https://fin-desk.vercel.app/`;
+  console.log(`Enviando email para ${ticket.emailSolicitante} e para jonathan.kauer@guiainvest.com.br`);
   const url =
     "https://script.google.com/macros/s/AKfycbz2xFbYeeP4sp8JdNeT2JxkeHk5SEDYrYOF37NizSPlAaG7J6KjekAWECVr6NPTJkUN/exec";
   const emails = ["jonathan.kauer@guiainvest.com.br", ticket.emailSolicitante];
@@ -116,8 +118,8 @@ const sendTicketUpdateEmail = async (ticket, updateDescription) => {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(formdata)
         })
-          .then(response => console.log(Requisição enviada com sucesso para ${email}!))
-          .catch(error => console.error(Erro na requisição para ${email}:, error));
+          .then(response => console.log(`Requisição enviada com sucesso para ${email}!`))
+          .catch(error => console.error(`Erro na requisição para ${email}:`, error));
       })
     );
   } catch (error) {
@@ -290,7 +292,7 @@ function App() {
             sla: "",
             comentarios: [...ticket.comentarios, reopenComment],
           };
-          sendTicketUpdateEmail(updatedTicket, Chamado reaberto. Comentário: ${reopenComment.text});
+          sendTicketUpdateEmail(updatedTicket, `Chamado reaberto. Comentário: ${reopenComment.text}`);
           return updatedTicket;
         }
         return ticket;
@@ -301,7 +303,6 @@ function App() {
     setReopenTicket(prev => ({ ...prev, [ticketId]: false }));
   };
 
-  // Refatoração da função handleAddComment com aviso visual para admin
   const handleAddComment = (ticketId) => {
     console.log("handleAddComment called for ticket:", ticketId);
     const commentText = newComments[ticketId];
@@ -314,19 +315,16 @@ function App() {
       console.log("Chamado não encontrado.");
       return;
     }
-    // Se o usuário for admin e estiver concluindo o ticket, exige comentário
     if (currentUser.isAdmin && adminEdits[ticketId]?.status === "Concluído" && (!commentText || commentText.trim() === "")) {
       setCommentWarnings(prev => ({ ...prev, [ticketId]: "É necessário adicionar um comentário antes de concluir o chamado." }));
       return;
     } else {
-      // Remove aviso se existir
       setCommentWarnings(prev => {
         const newWarnings = { ...prev };
         delete newWarnings[ticketId];
         return newWarnings;
       });
     }
-    // Se o usuário for admin e houver edições, atualiza ticket
     let updatedTicket = { ...ticket };
     if (currentUser.isAdmin && adminEdits[ticketId]) {
       if (adminEdits[ticketId].status) {
@@ -340,7 +338,6 @@ function App() {
         updatedTicket.responsavel = adminEdits[ticketId].responsavel;
       }
     }
-    // Cria o comentário (para admin, prefixa "Admin:"; para usuários, usa o nome do solicitante)
     const comment = {
       text: commentText,
       user: currentUser.isAdmin ? ("Admin: " + (ticket.responsavel || "")) : ticket.nomeSolicitante,
@@ -349,7 +346,7 @@ function App() {
     };
     updatedTicket.comentarios = [...ticket.comentarios, comment];
     console.log("Updated ticket:", updatedTicket);
-    sendTicketUpdateEmail(updatedTicket, Novo comentário adicionado: ${comment.text});
+    sendTicketUpdateEmail(updatedTicket, `Novo comentário adicionado: ${comment.text}`);
     setTickets(prev => prev.map(t => t.id === ticketId ? updatedTicket : t));
     setNewComments(prev => ({ ...prev, [ticketId]: "" }));
     setNewCommentFilesByTicket(prev => ({ ...prev, [ticketId]: [] }));
@@ -390,7 +387,6 @@ function App() {
     }
   };
 
-  // Filtragem de tickets: para admins, aplica os filtros; para usuários, filtra pelo e-mail
   let filteredTickets = tickets;
   if (currentUser && currentUser.isAdmin) {
     if (adminFilterPriority) {
@@ -435,7 +431,6 @@ function App() {
           localStorage.setItem("users", JSON.stringify(users));
           alert("Senha cadastrada com sucesso!");
         }
-        // Admin logado como usuário
         setCurrentUser({ email: loginEmail, isAdmin: false });
         setLoginEmail("");
         setLoginPassword("");
@@ -491,7 +486,6 @@ function App() {
         <link rel="icon" href="/guiainvest-logo.png" />
       </Helmet>
 
-      {/* Botão Sair */}
       {currentUser && (
         <div className="absolute top-4 right-4">
           <button onClick={handleLogout} className="px-3 py-1 rounded shadow" style={{ backgroundColor: "#FF5E00", color: "white" }}>
@@ -500,7 +494,6 @@ function App() {
         </div>
       )}
 
-      {/* Cabeçalho Centralizado */}
       <div className="flex flex-col items-center mb-4">
         <img src="/logo.png" alt="FinDesk Logo" className="h-12 mb-2" />
         <motion.h1 className="text-3xl font-bold" initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }}>
@@ -508,7 +501,6 @@ function App() {
         </motion.h1>
       </div>
 
-      {/* Tela de Login Centralizada */}
       {!currentUser && (
         <div className="flex items-center justify-center">
           <form onSubmit={handleLoginSubmit} className="bg-white shadow p-4 rounded-2xl w-full max-w-md">
@@ -536,10 +528,8 @@ function App() {
         </div>
       )}
 
-      {/* Ambiente Logado */}
       {currentUser && (
         <>
-          {/* Menus de Chamados Centralizados */}
           <div className="flex flex-col items-center mb-4">
             <div className="flex gap-4 mb-4">
               <button onClick={() => setActiveTab("open")} className="px-3 py-1 rounded" style={ activeTab === "open" ? { backgroundColor: "#0E1428", color: "white" } : { backgroundColor: "#f2f2f2", color: "#0E1428", border: "1px solid #0E1428" } }>
@@ -573,7 +563,6 @@ function App() {
             )}
           </div>
 
-          {/* Botão "Criar Novo Chamado" para usuários (não admin) */}
           {!currentUser.isAdmin && (
             <div className="mb-4 flex justify-center">
               <button onClick={() => setShowNewTicketForm(true)} className="px-3 py-1 rounded shadow" style={{ backgroundColor: "#FF5E00", color: "white" }}>
@@ -643,7 +632,7 @@ function App() {
                   <div className="flex justify-between items-center">
                     <div>
                       <h2 className="text-xl font-bold">
-                        {currentUser.isAdmin ? Solicitante: ${ticket.nomeSolicitante} : ID: ${ticket.id}}
+                        {currentUser.isAdmin ? `Solicitante: ${ticket.nomeSolicitante}` : `ID: ${ticket.id}`}
                       </h2>
                       <p className="text-gray-700">
                         <span className="font-semibold">Categoria:</span> {ticket.categoria} |{" "}
@@ -767,7 +756,6 @@ function App() {
                           </div>
                         </div>
                       ) : (
-                        // Para usuários não-admin, se o ticket estiver concluído, exibe botão para reabrir
                         !currentUser.isAdmin && (
                           <div className="mb-4">
                             {reopenTicket[ticket.id] ? (
@@ -794,6 +782,12 @@ function App() {
                 </motion.div>
               );
             })}
+          </div>
+
+          {/* Integração do componente FinancasList */}
+          <div className="mt-8 w-full max-w-5xl mx-auto">
+            <h2 className="text-2xl font-bold mb-4">Registros de Finanças</h2>
+            <FinancasList />
           </div>
         </>
       )}
