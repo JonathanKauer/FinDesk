@@ -1,9 +1,9 @@
-// FinancasList.jsx
+// FinancasList.js
 import React, { useState, useEffect } from 'react';
 import { collection, onSnapshot } from 'firebase/firestore';
 import { db } from './firebase-config.js';
 
-// FinancasList.jsx
+// FinancasList.js
 import React, { useState, useEffect } from 'react';
 import { collection, onSnapshot } from 'firebase/firestore';
 import { db } from './firebase-config.js';
