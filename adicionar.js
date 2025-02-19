@@ -9,3 +9,13 @@ async function adicionarRegistro(data) {
     console.error("Erro ao adicionar documento:", e);
   }
 }
+
+// Exemplo de dados a serem inseridos
+const dadosExemplo = {
+  nome: "Conta Corrente",
+  saldo: 1000,
+  data: new Date()
+};
+
+// Chama a função para adicionar os dados
+adicionarRegistro(dadosExemplo);
