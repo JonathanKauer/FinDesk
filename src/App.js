@@ -2,7 +2,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Helmet } from "react-helmet";
-import FinancasList from './FinancasList.jsx';
 import { collection, addDoc } from 'firebase/firestore';
 import { db } from './firebase-config.js';
 
@@ -792,12 +791,6 @@ function App() {
                 </motion.div>
               );
             })}
-          </div>
-
-          {/* Seção de Registros de Finanças */}
-          <div className="mt-8 w-full max-w-5xl mx-auto">
-            <h2 className="text-2xl font-bold mb-4">Registros de Finanças</h2>
-            <FinancasList />
           </div>
         </>
       )}
