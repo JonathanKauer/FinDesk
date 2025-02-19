@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Helmet } from "react-helmet";
-import FinancasList from './FinancasList'; // Importa o componente FinancasList
+import FinancasList from './FinancasList.js'; // Importa o componente FinancasList
 
 // Opções para Cargo/Departamento
 const initialCargoOptions = [
