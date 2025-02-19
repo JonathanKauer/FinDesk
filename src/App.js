@@ -4,8 +4,10 @@ import { motion } from 'framer-motion';
 import { Helmet } from "react-helmet";
 import { collection, addDoc } from 'firebase/firestore';
 import { db } from './firebase-config.js';
-import TicketList from './TicketList.js';        // Para usuário comum
-import TicketListAdmin from './TicketListAdmin.js'; // Para admin
+
+// Componentes de listagem
+import TicketList from './TicketList.js';         // Usuário comum
+import TicketListAdmin from './TicketListAdmin.js'; // Admin
 
 // Opções para Cargo/Departamento
 const initialCargoOptions = [
@@ -29,10 +31,10 @@ const priorityOptions = [
   "Urgente (1 dia útil)"
 ];
 
-// Opções de atendentes (para admin)
+// Opções de atendentes (apenas para admin)
 const atendenteOptions = ["Jonathan Kauer", "Nayla Martins"];
 
-// Tabela para converter prioridade em dias úteis
+// Mapeamento prioridade -> dias úteis
 const priorityDaysMapping = {
   "Baixa (7 dias úteis)": 7,
   "Média (5 dias úteis)": 5,
@@ -40,7 +42,6 @@ const priorityDaysMapping = {
   "Urgente (1 dia útil)": 1,
 };
 
-// Função para adicionar dias úteis
 function addBusinessDays(date, days) {
   let result = new Date(date);
   while (days > 0) {
@@ -53,7 +54,6 @@ function addBusinessDays(date, days) {
   return result;
 }
 
-// Gera ID aleatório para o ticket
 function generateTicketId() {
   const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
   let id = "";
@@ -63,7 +63,7 @@ function generateTicketId() {
   return id;
 }
 
-// Exemplo de envio de e-mail (script do Google Apps)
+// Exemplo de envio de e-mail
 async function sendTicketUpdateEmail(ticket, updateDescription) {
   const subject = "Findesk: Atualização em chamado";
   const body =
@@ -74,6 +74,7 @@ async function sendTicketUpdateEmail(ticket, updateDescription) {
     `Descrição: ${ticket.descricaoProblema}\n` +
     `Link de acesso: https://fin-desk.vercel.app/`;
   console.log(`Enviando email para ${ticket.emailSolicitante} e para jonathan.kauer@guiainvest.com.br`);
+
   const url = "https://script.google.com/macros/s/AKfycbz2xFbYeeP4sp8JdNeT2JxkeHk5SEDYrYOF37NizSPlAaG7J6KjekAWECVr6NPTJkUN/exec";
   const emails = ["jonathan.kauer@guiainvest.com.br", ticket.emailSolicitante];
 
@@ -102,7 +103,15 @@ function App() {
   const [loginEmail, setLoginEmail] = useState("");
   const [loginPassword, setLoginPassword] = useState("");
 
-  // Controle do formulário de criação de ticket
+  // Controle de abas (Abertos/Concluídos)
+  const [activeTab, setActiveTab] = useState("open");
+
+  // Filtros de admin
+  const [adminFilterPriority, setAdminFilterPriority] = useState("");
+  const [adminFilterCategory, setAdminFilterCategory] = useState("");
+  const [adminFilterAtendente, setAdminFilterAtendente] = useState("");
+
+  // Formulário de novo chamado
   const [showNewTicketForm, setShowNewTicketForm] = useState(false);
   const [newTicketNome, setNewTicketNome] = useState("");
   const [cargoDepartamento, setCargoDepartamento] = useState("");
@@ -119,14 +128,6 @@ function App() {
     "+Novo"
   ]);
 
-  // Controle das abas: "open" (abertos e em andamento) ou "closed" (concluídos)
-  const [activeTab, setActiveTab] = useState("open");
-
-  // Filtros extras (somente admin)
-  const [adminFilterPriority, setAdminFilterPriority] = useState("");
-  const [adminFilterCategory, setAdminFilterCategory] = useState("");
-  const [adminFilterAtendente, setAdminFilterAtendente] = useState("");
-
   // Lógica de login
   const handleLoginSubmit = (e) => {
     e.preventDefault();
@@ -134,15 +135,14 @@ function App() {
       alert("Por favor, preencha todos os campos de login.");
       return;
     }
-    // Emails de admin
+    // E-mails admin
     const adminEmails = ["jonathan.kauer@guiainvest.com.br", "nayla.martins@guiainvest.com.br"];
     let isAdmin = false;
     if (adminEmails.includes(loginEmail.toLowerCase())) {
-      // Se a senha for "admin123@guiainvestgpt", vira admin
       if (loginPassword === "admin123@guiainvestgpt") {
         isAdmin = true;
       } else {
-        alert("Senha de admin incorreta. Logando como usuário comum.");
+        alert("Senha de admin incorreta. Você será logado como usuário comum.");
       }
     }
     setCurrentUser({ email: loginEmail, isAdmin });
@@ -150,7 +150,7 @@ function App() {
     setLoginPassword("");
   };
 
-  // Criação de ticket no Firestore
+  // Criação de ticket
   const handleCreateTicket = async (e) => {
     e.preventDefault();
     if (!newTicketNome.trim()) {
@@ -202,7 +202,6 @@ function App() {
     setShowNewTicketForm(false);
   };
 
-  // Anexos
   const handleTicketFileChange = (e) => {
     setNewTicketFiles(Array.from(e.target.files));
   };
@@ -212,7 +211,7 @@ function App() {
     setCurrentUser(null);
   };
 
-  // Reset de senha (básico)
+  // Redefinir senha
   const handleResetPassword = () => {
     if (!loginEmail.trim()) {
       alert("Por favor, insira seu e-mail para redefinir a senha.");
@@ -228,7 +227,7 @@ function App() {
       alert("As senhas não coincidem!");
       return;
     }
-    alert("Senha redefinida com sucesso!");
+    alert("No primeiro acesso, sua senha será cadastrada automaticamente.");
   };
 
   return (
@@ -240,6 +239,7 @@ function App() {
 
       {/* Cabeçalho (logo + título) - aparece sempre */}
       <div className="flex flex-col items-center mb-4">
+        {/* Ajuste o caminho da imagem do logo conforme sua estrutura */}
         <img src="/logo.png" alt="FinDesk Logo" className="h-12 mb-2" />
         <motion.h1
           className="text-3xl font-bold"
@@ -279,10 +279,11 @@ function App() {
                 className="border rounded px-2 py-1 w-full"
               />
               <small className="text-gray-500" style={{ fontSize: "0.75rem" }}>
-                Se usar um e-mail admin e a senha correta, você loga como admin.
+                No primeiro acesso, sua senha será cadastrada automaticamente.
               </small>
             </div>
-            <div className="flex justify-end mt-4">
+            <div className="flex justify-between mt-4">
+              {/* Botão Entrar à esquerda */}
               <button
                 type="submit"
                 className="px-3 py-1 rounded shadow"
@@ -290,6 +291,7 @@ function App() {
               >
                 Entrar
               </button>
+              {/* Botão Redefinir senha à direita */}
               <button
                 type="button"
                 onClick={handleResetPassword}
@@ -317,7 +319,7 @@ function App() {
             </button>
           </div>
 
-          {/* Menus de Chamados (Abertos/Concluídos) */}
+          {/* Menus de Chamados (Abertos e Concluídos) */}
           <div className="flex flex-col items-center mb-4">
             <div className="flex gap-4 mb-4">
               <button
@@ -397,7 +399,7 @@ function App() {
             </div>
           )}
 
-          {/* Formulário de criação de ticket */}
+          {/* Formulário de criação de chamado */}
           {showNewTicketForm && (
             <motion.form
               className="bg-white shadow p-4 rounded-2xl w-full max-w-lg mx-auto mb-4"
@@ -514,7 +516,7 @@ function App() {
             </motion.form>
           )}
 
-          {/* Exibição dos Tickets do Firestore */}
+          {/* Se for admin, exibe TicketListAdmin; se for usuário, TicketList */}
           <div className="mt-8 w-full max-w-5xl mx-auto">
             {currentUser.isAdmin ? (
               <TicketListAdmin
@@ -527,8 +529,8 @@ function App() {
             ) : (
               <TicketList
                 activeTab={activeTab}
-                onSendEmail={sendTicketUpdateEmail}
                 currentUser={currentUser}
+                onSendEmail={sendTicketUpdateEmail}
               />
             )}
           </div>
