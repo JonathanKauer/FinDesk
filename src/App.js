@@ -32,7 +32,7 @@ const priorityOptions = [
 ];
 
 // Opções de atendentes (apenas para admin)
-const atendenteOptions = ["Jonathan Kauer", "Nayla Martins"];
+const atendenteOptions = ["jonathan.kauer@guiainvest.com.br", "nayla.martins@guiainvest.com.br"];
 
 // Mapeamento prioridade -> dias úteis
 const priorityDaysMapping = {
@@ -98,7 +98,7 @@ async function sendTicketUpdateEmail(ticket, updateDescription) {
 }
 
 function App() {
-  // currentUser: { email, isAdmin }
+  // currentUser: { uid, email, isAdmin }
   const [currentUser, setCurrentUser] = useState(null);
   const [loginEmail, setLoginEmail] = useState("");
   const [loginPassword, setLoginPassword] = useState("");
@@ -145,7 +145,9 @@ function App() {
         alert("Senha de admin incorreta. Você será logado como usuário comum.");
       }
     }
-    setCurrentUser({ email: loginEmail, isAdmin });
+    // Para este exemplo, usamos o próprio e-mail como UID.
+    // Em uma implementação real, você utilizaria o UID fornecido pelo Firebase Auth.
+    setCurrentUser({ uid: loginEmail, email: loginEmail, isAdmin });
     setLoginEmail("");
     setLoginPassword("");
   };
@@ -165,10 +167,12 @@ function App() {
     const prazoFinalizacaoDate = addBusinessDays(dataDeAbertura, daysToAdd);
     const prazoFinalizacao = prazoFinalizacaoDate.toISOString();
 
+    // ADICIONADO: campo "userId" para associar o ticket ao usuário
     const newTicket = {
       id: generateTicketId(),
       nomeSolicitante: newTicketNome,
       emailSolicitante: currentUser.email,
+      userId: currentUser.uid,
       cargoDepartamento,
       descricaoProblema,
       categoria,
@@ -237,9 +241,8 @@ function App() {
         <link rel="icon" href="/guiainvest-logo.png" />
       </Helmet>
 
-      {/* Cabeçalho (logo + título) - aparece sempre */}
+      {/* Cabeçalho (logo + título) */}
       <div className="flex flex-col items-center mb-4">
-        {/* Ajuste o caminho da imagem do logo conforme sua estrutura */}
         <img src="/logo.png" alt="FinDesk Logo" className="h-12 mb-2" />
         <motion.h1
           className="text-3xl font-bold"
@@ -250,13 +253,10 @@ function App() {
         </motion.h1>
       </div>
 
-      {/* Se não logado, tela de login */}
+      {/* Tela de login */}
       {!currentUser && (
         <div className="flex items-center justify-center">
-          <form
-            onSubmit={handleLoginSubmit}
-            className="bg-white shadow p-4 rounded-2xl w-full max-w-md"
-          >
+          <form onSubmit={handleLoginSubmit} className="bg-white shadow p-4 rounded-2xl w-full max-w-md">
             <h2 className="text-xl font-bold mb-4 text-center">Faça seu login</h2>
             <div className="mb-2">
               <label className="block font-semibold">E-mail:</label>
@@ -283,15 +283,9 @@ function App() {
               </small>
             </div>
             <div className="flex justify-between mt-4">
-              {/* Botão Entrar à esquerda */}
-              <button
-                type="submit"
-                className="px-3 py-1 rounded shadow"
-                style={{ backgroundColor: "#0E1428", color: "white" }}
-              >
+              <button type="submit" className="px-3 py-1 rounded shadow" style={{ backgroundColor: "#0E1428", color: "white" }}>
                 Entrar
               </button>
-              {/* Botão Redefinir senha à direita */}
               <button
                 type="button"
                 onClick={handleResetPassword}
@@ -305,21 +299,15 @@ function App() {
         </div>
       )}
 
-      {/* Se logado, mostra o resto */}
+      {/* Área logada */}
       {currentUser && (
         <>
-          {/* Botão logout no topo direito */}
           <div className="absolute top-4 right-4">
-            <button
-              onClick={handleLogout}
-              className="px-3 py-1 rounded shadow"
-              style={{ backgroundColor: "#FF5E00", color: "white" }}
-            >
+            <button onClick={handleLogout} className="px-3 py-1 rounded shadow" style={{ backgroundColor: "#FF5E00", color: "white" }}>
               Sair
             </button>
           </div>
 
-          {/* Menus de Chamados (Abertos e Concluídos) */}
           <div className="flex flex-col items-center mb-4">
             <div className="flex gap-4 mb-4">
               <button
@@ -346,7 +334,7 @@ function App() {
               </button>
             </div>
 
-            {/* Filtros adicionais (somente admin) */}
+            {/* Filtros para admin */}
             {currentUser.isAdmin && (
               <div className="flex flex-col sm:flex-row items-center gap-2">
                 <select
@@ -365,12 +353,9 @@ function App() {
                   className="border rounded px-2 py-1"
                 >
                   <option value="">Categoria: Todas</option>
-                  {categoryOptions
-                    .filter(cat => cat !== "+Novo")
-                    .map((cat, idx) => (
-                      <option key={idx} value={cat}>{cat}</option>
-                    ))
-                  }
+                  {categoryOptions.filter(cat => cat !== "+Novo").map((cat, idx) => (
+                    <option key={idx} value={cat}>{cat}</option>
+                  ))}
                 </select>
                 <select
                   value={adminFilterAtendente}
@@ -386,7 +371,7 @@ function App() {
             )}
           </div>
 
-          {/* Se for usuário comum, exibe botão "Criar Novo Chamado" */}
+          {/* Botão "Criar Novo Chamado" somente para usuários comuns */}
           {!currentUser.isAdmin && (
             <div className="mb-4 flex justify-center">
               <button
@@ -498,25 +483,17 @@ function App() {
                 <input type="file" multiple onChange={handleTicketFileChange} className="w-full" />
               </div>
               <div className="flex justify-end gap-2 mt-4">
-                <button
-                  type="button"
-                  onClick={() => setShowNewTicketForm(false)}
-                  className="px-3 py-1 bg-gray-300 rounded"
-                >
+                <button type="button" onClick={() => setShowNewTicketForm(false)} className="px-3 py-1 bg-gray-300 rounded">
                   Cancelar
                 </button>
-                <button
-                  type="submit"
-                  className="px-3 py-1 rounded"
-                  style={{ backgroundColor: "#0E1428", color: "white" }}
-                >
+                <button type="submit" className="px-3 py-1 rounded" style={{ backgroundColor: "#0E1428", color: "white" }}>
                   Criar Chamado
                 </button>
               </div>
             </motion.form>
           )}
 
-          {/* Se for admin, exibe TicketListAdmin; se for usuário, TicketList */}
+          {/* Renderiza a lista de tickets */}
           <div className="mt-8 w-full max-w-5xl mx-auto">
             {currentUser.isAdmin ? (
               <TicketListAdmin
@@ -527,6 +504,8 @@ function App() {
                 onSendEmail={sendTicketUpdateEmail}
               />
             ) : (
+              // No componente TicketList, garanta que a consulta use:
+              // where("userId", "==", currentUser.uid)
               <TicketList
                 activeTab={activeTab}
                 currentUser={currentUser}
