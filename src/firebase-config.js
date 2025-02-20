@@ -4,7 +4,6 @@ import { getFirestore } from "firebase/firestore";
 import { getAuth } from "firebase/auth";
 
 const firebaseConfig = {
-const firebaseConfig = {
   apiKey: "AIzaSyCGBrOC7ZCJ0y_MWM7EPxQRTw79BrXN5LA",
   authDomain: "findesktickets.firebaseapp.com",
   projectId: "findesktickets",
