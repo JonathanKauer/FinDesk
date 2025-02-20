@@ -9,10 +9,10 @@ const TicketList = ({ currentUser, activeTab, onSendEmail }) => {
 
   useEffect(() => {
     if (!currentUser) return;
-    // Filtra pelo e-mail do usuário
+    // Filtra pelos tickets criados pelo usuário usando o UID
     let q = query(
       collection(db, 'tickets'),
-      where('emailSolicitante', '==', currentUser.email),
+      where('userId', '==', currentUser.uid),
       orderBy('dataDeAberturaISO', 'desc')
     );
     const unsubscribe = onSnapshot(q, (snapshot) => {
@@ -30,7 +30,7 @@ const TicketList = ({ currentUser, activeTab, onSendEmail }) => {
       setTickets(filtered);
       setLoading(false);
     }, (err) => {
-      console.log("Erro ao buscar tickets (usuário):", err); // Não exibe na tela
+      console.log("Erro ao buscar tickets (usuário):", err);
       setLoading(false);
     });
     return () => unsubscribe();
