@@ -102,6 +102,16 @@ async function sendTicketUpdateEmail(ticket, updateDescription) {
   }
 }
 
+// Função para validar que o nome é composto e com iniciais maiúsculas
+function isValidSolicitanteName(name) {
+  const parts = name.trim().split(/\s+/);
+  if (parts.length < 2) return false;
+  for (const part of parts) {
+    if (part[0] !== part[0].toUpperCase()) return false;
+  }
+  return true;
+}
+
 function App() {
   // Estado de autenticação real
   const [currentUser, setCurrentUser] = useState(null);
@@ -201,17 +211,16 @@ function App() {
       });
   };
 
-  // Função para redefinir senha (exemplo com sendPasswordResetEmail pode ser implementada)
+  // Função para redefinir senha (pode ser aprimorada com sendPasswordResetEmail)
   const handleResetPassword = () => {
     if (!loginEmail.trim()) {
       alert("Por favor, insira seu e-mail para redefinir a senha.");
       return;
     }
-    // Aqui, você pode usar sendPasswordResetEmail(auth, loginEmail)
     alert("Este fluxo ainda não está implementado.");
   };
 
-  // Função de criação de ticket com logs de depuração
+  // Função de criação de ticket com logs de depuração e validação do nome
   const handleCreateTicket = async (e) => {
     e.preventDefault();
     console.log("Iniciando criação do chamado...");
@@ -219,6 +228,12 @@ function App() {
     if (!newTicketNome.trim()) {
       alert("Insira o nome completo do solicitante.");
       console.log("Criação abortada: campo de nome vazio.");
+      return;
+    }
+
+    if (!isValidSolicitanteName(newTicketNome)) {
+      alert("Por favor, insira um nome composto com as iniciais em maiúsculas.");
+      console.log("Criação abortada: nome inválido.");
       return;
     }
 
