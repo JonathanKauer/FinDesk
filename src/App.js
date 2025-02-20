@@ -324,9 +324,6 @@ function App() {
                   required
                   className="border rounded px-2 py-1 w-full"
                 />
-                <small className="text-gray-500" style={{ fontSize: "0.75rem" }}>
-                  No primeiro acesso, sua senha será cadastrada automaticamente.
-                </small>
               </div>
               <div className="flex justify-between mt-4">
                 <button type="submit" className="px-3 py-1 rounded shadow" style={{ backgroundColor: "#0E1428", color: "white" }}>
