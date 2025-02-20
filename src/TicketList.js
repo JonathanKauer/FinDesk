@@ -8,10 +8,19 @@ const TicketList = ({ currentUser, activeTab, onSendEmail }) => {
   const [loading, setLoading] = useState(true);
   const [editingTicketId, setEditingTicketId] = useState(null);
   const [editedTicket, setEditedTicket] = useState({});
+  const [newAttachments, setNewAttachments] = useState([]); // novos anexos
+
+  // Supondo que as opções de prioridade estejam fixas e sejam as mesmas do App.js
+  const priorityOptions = [
+    "Baixa (7 dias úteis)",
+    "Média (5 dias úteis)",
+    "Alta (2 dias úteis)",
+    "Urgente (1 dia útil)"
+  ];
 
   useEffect(() => {
     if (!currentUser) return;
-    // Consulta para mostrar somente os tickets do usuário
+    // Consulta para exibir somente os tickets do usuário
     const q = query(
       collection(db, 'tickets'),
       where('userId', '==', currentUser.uid),
@@ -29,22 +38,25 @@ const TicketList = ({ currentUser, activeTab, onSendEmail }) => {
       setTickets(filtered);
       setLoading(false);
     }, (err) => {
-      console.log("Erro ao buscar tickets (usuário):", err);
+      console.error("Erro ao buscar tickets (usuário):", err);
       setLoading(false);
     });
     return () => unsubscribe();
   }, [currentUser, activeTab]);
 
+  // Inicia o modo de edição e preenche os dados editáveis
   const handleEditClick = (ticket) => {
     setEditingTicketId(ticket.id);
-    // Preenche o formulário com os dados atuais do ticket
     setEditedTicket({
       descricaoProblema: ticket.descricaoProblema,
-      categoria: ticket.categoria,
       prioridade: ticket.prioridade,
+      // Armazenamos os anexos atuais para referência (somente para exibição)
+      attachments: ticket.attachments || [],
+      // Categoria e Cargo/Departamento serão exibidos como info, não editáveis
+      categoria: ticket.categoria,
       cargoDepartamento: ticket.cargoDepartamento
-      // Você pode adicionar outros campos editáveis aqui
     });
+    setNewAttachments([]); // limpa novos anexos
   };
 
   const handleEditChange = (e) => {
@@ -52,20 +64,38 @@ const TicketList = ({ currentUser, activeTab, onSendEmail }) => {
     setEditedTicket(prev => ({ ...prev, [name]: value }));
   };
 
+  const handleNewAttachmentsChange = (e) => {
+    setNewAttachments(Array.from(e.target.files));
+  };
+
   const handleCancelEdit = () => {
     setEditingTicketId(null);
     setEditedTicket({});
+    setNewAttachments([]);
   };
 
-  const handleSaveEdit = async (ticketId) => {
+  // Salva as alterações: atualiza descrição, prioridade e anexa os novos arquivos
+  const handleSaveEdit = async (ticket) => {
     try {
-      const ticketRef = doc(db, 'tickets', ticketId);
-      // Atualiza os campos editáveis; assegure-se que as regras permitem essa atualização
-      await updateDoc(ticketRef, editedTicket);
+      const ticketRef = doc(db, 'tickets', ticket.id);
+      // Combine os anexos originais com os novos (se houver)
+      const updatedAttachments = ticket.attachments
+        ? [...ticket.attachments, ...newAttachments]
+        : newAttachments;
+      // Monta o objeto de atualização (Categoria e Cargo/Departamento não podem ser alterados)
+      const updateData = {
+        descricaoProblema: editedTicket.descricaoProblema,
+        prioridade: editedTicket.prioridade,
+        attachments: updatedAttachments
+      };
+      await updateDoc(ticketRef, updateData);
       setEditingTicketId(null);
       setEditedTicket({});
-      // Opcional: notifique via e-mail a atualização
-      // onSendEmail(ticket, "Chamado atualizado");
+      setNewAttachments([]);
+      // Opcional: Enviar notificação de atualização via e-mail
+      if (onSendEmail) {
+        onSendEmail({ ...ticket, ...updateData }, "Chamado atualizado");
+      }
     } catch (error) {
       console.error("Erro ao atualizar ticket:", error);
       alert("Falha ao atualizar o ticket. Verifique o console para detalhes.");
@@ -81,13 +111,12 @@ const TicketList = ({ currentUser, activeTab, onSendEmail }) => {
       {tickets.map(ticket => (
         <div key={ticket.id} className="border rounded p-2 mb-2 bg-white">
           <p><strong>ID:</strong> {ticket.id}</p>
-          <p><strong>Cargo/Departamento:</strong> {ticket.cargoDepartamento}</p>
           <p><strong>Categoria:</strong> {ticket.categoria}</p>
+          <p><strong>Cargo/Departamento:</strong> {ticket.cargoDepartamento}</p>
           <p><strong>Prioridade:</strong> {ticket.prioridade}</p>
           <p><strong>Status:</strong> {ticket.status}</p>
           <p><strong>Data de Abertura:</strong> {ticket.dataDeAbertura}</p>
           {editingTicketId === ticket.id ? (
-            // Formulário de edição
             <div className="mt-2">
               <label className="block font-semibold">Descrição do Problema:</label>
               <textarea
@@ -97,33 +126,29 @@ const TicketList = ({ currentUser, activeTab, onSendEmail }) => {
                 className="border rounded px-2 py-1 w-full"
                 rows="3"
               />
-              <label className="block font-semibold mt-2">Categoria:</label>
-              <input
-                type="text"
-                name="categoria"
-                value={editedTicket.categoria || ""}
-                onChange={handleEditChange}
-                className="border rounded px-2 py-1 w-full"
-              />
               <label className="block font-semibold mt-2">Prioridade:</label>
-              <input
-                type="text"
+              <select
                 name="prioridade"
                 value={editedTicket.prioridade || ""}
                 onChange={handleEditChange}
                 className="border rounded px-2 py-1 w-full"
-              />
-              <label className="block font-semibold mt-2">Cargo/Departamento:</label>
+              >
+                {priorityOptions.map((option, idx) => (
+                  <option key={idx} value={option}>{option}</option>
+                ))}
+              </select>
+              <p className="mt-2"><strong>Categoria:</strong> {editedTicket.categoria}</p>
+              <p className="mt-1"><strong>Cargo/Departamento:</strong> {editedTicket.cargoDepartamento}</p>
+              <label className="block font-semibold mt-2">Adicionar Novos Anexos:</label>
               <input
-                type="text"
-                name="cargoDepartamento"
-                value={editedTicket.cargoDepartamento || ""}
-                onChange={handleEditChange}
-                className="border rounded px-2 py-1 w-full"
+                type="file"
+                multiple
+                onChange={handleNewAttachmentsChange}
+                className="w-full"
               />
               <div className="flex gap-2 mt-2">
                 <button
-                  onClick={() => handleSaveEdit(ticket.id)}
+                  onClick={() => handleSaveEdit(ticket)}
                   className="px-3 py-1 rounded shadow"
                   style={{ backgroundColor: "#0E1428", color: "white" }}
                 >
@@ -141,7 +166,17 @@ const TicketList = ({ currentUser, activeTab, onSendEmail }) => {
           ) : (
             <div className="mt-2">
               <p><strong>Descrição do Problema:</strong> {ticket.descricaoProblema}</p>
-              {/* Botão para iniciar a edição se o chamado estiver aberto */}
+              {/* Exibir anexos originais se houver */}
+              {ticket.attachments && ticket.attachments.length > 0 && (
+                <div>
+                  <strong>Anexos:</strong>
+                  <ul>
+                    {ticket.attachments.map((file, idx) => (
+                      <li key={idx}>{file.name || `Anexo ${idx + 1}`}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
               {ticket.status !== "Concluído" && (
                 <button
                   onClick={() => handleEditClick(ticket)}
