@@ -1,9 +1,10 @@
 // src/App.js
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Helmet } from "react-helmet";
 import { collection, addDoc } from 'firebase/firestore';
-import { db } from './firebase-config.js';
+import { onAuthStateChanged, signInWithEmailAndPassword } from "firebase/auth";
+import { db, auth } from './firebase-config.js';
 
 // Componentes de listagem
 import TicketList from './TicketList.js';         // Usuário comum
@@ -98,7 +99,7 @@ async function sendTicketUpdateEmail(ticket, updateDescription) {
 }
 
 function App() {
-  // currentUser: { uid, email, isAdmin }
+  // currentUser: usuário real logado pelo Firebase Auth
   const [currentUser, setCurrentUser] = useState(null);
   const [loginEmail, setLoginEmail] = useState("");
   const [loginPassword, setLoginPassword] = useState("");
@@ -128,35 +129,49 @@ function App() {
     "+Novo"
   ]);
 
-  // Lógica de login
+  // ---------------------------
+  // PASSO 7: Persistência do login real com onAuthStateChanged
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      setCurrentUser(user);
+    });
+    return () => unsubscribe();
+  }, []);
+  // ---------------------------
+
+  // Lógica de login com Firebase Auth (PASSO 3)
   const handleLoginSubmit = (e) => {
     e.preventDefault();
     if (!loginEmail.trim() || !loginPassword.trim()) {
       alert("Por favor, preencha todos os campos de login.");
       return;
     }
-    // E-mails admin
-    const adminEmails = ["jonathan.kauer@guiainvest.com.br", "nayla.martins@guiainvest.com.br"];
-    let isAdmin = false;
-    if (adminEmails.includes(loginEmail.toLowerCase())) {
-      if (loginPassword === "admin123@guiainvestgpt") {
-        isAdmin = true;
-      } else {
-        alert("Senha de admin incorreta. Você será logado como usuário comum.");
-      }
-    }
-    // Para este exemplo, usamos o próprio e-mail como UID.
-    // Em uma implementação real, você utilizaria o UID fornecido pelo Firebase Auth.
-    setCurrentUser({ uid: loginEmail, email: loginEmail, isAdmin });
-    setLoginEmail("");
-    setLoginPassword("");
+    signInWithEmailAndPassword(auth, loginEmail, loginPassword)
+      .then((userCredential) => {
+        // O Firebase Auth fornece o usuário autenticado
+        const user = userCredential.user;
+        console.log("Usuário logado com sucesso:", user.uid);
+        // currentUser será atualizado pelo onAuthStateChanged
+        setLoginEmail("");
+        setLoginPassword("");
+      })
+      .catch((error) => {
+        console.error("Erro ao fazer login:", error);
+        alert("Falha ao autenticar. Verifique suas credenciais.");
+      });
   };
 
-  // Criação de ticket
+  // Criação de ticket (PASSO 4: associar ticket ao UID real)
   const handleCreateTicket = async (e) => {
     e.preventDefault();
     if (!newTicketNome.trim()) {
       alert("Insira o nome completo do solicitante.");
+      return;
+    }
+    // Certifique-se de que o usuário está logado de verdade
+    const user = auth.currentUser;
+    if (!user) {
+      alert("Você precisa estar logado para criar um ticket.");
       return;
     }
     const dataDeAbertura = new Date();
@@ -167,12 +182,11 @@ function App() {
     const prazoFinalizacaoDate = addBusinessDays(dataDeAbertura, daysToAdd);
     const prazoFinalizacao = prazoFinalizacaoDate.toISOString();
 
-    // ADICIONADO: campo "userId" para associar o ticket ao usuário
     const newTicket = {
       id: generateTicketId(),
       nomeSolicitante: newTicketNome,
-      emailSolicitante: currentUser.email,
-      userId: currentUser.uid,
+      emailSolicitante: user.email,
+      userId: user.uid, // ASSOCIAÇÃO REAL do ticket ao UID
       cargoDepartamento,
       descricaoProblema,
       categoria,
@@ -210,12 +224,13 @@ function App() {
     setNewTicketFiles(Array.from(e.target.files));
   };
 
-  // Logout
+  // Logout (usa auth.signOut)
   const handleLogout = () => {
+    auth.signOut();
     setCurrentUser(null);
   };
 
-  // Redefinir senha
+  // Redefinir senha (exemplo simplificado)
   const handleResetPassword = () => {
     if (!loginEmail.trim()) {
       alert("Por favor, insira seu e-mail para redefinir a senha.");
@@ -253,7 +268,7 @@ function App() {
         </motion.h1>
       </div>
 
-      {/* Tela de login */}
+      {/* Se não logado, tela de login */}
       {!currentUser && (
         <div className="flex items-center justify-center">
           <form onSubmit={handleLoginSubmit} className="bg-white shadow p-4 rounded-2xl w-full max-w-md">
@@ -299,7 +314,7 @@ function App() {
         </div>
       )}
 
-      {/* Área logada */}
+      {/* Se logado, mostra o restante da aplicação */}
       {currentUser && (
         <>
           <div className="absolute top-4 right-4">
@@ -334,45 +349,47 @@ function App() {
               </button>
             </div>
 
-            {/* Filtros para admin */}
-            {currentUser.isAdmin && (
-              <div className="flex flex-col sm:flex-row items-center gap-2">
-                <select
-                  value={adminFilterPriority}
-                  onChange={(e) => setAdminFilterPriority(e.target.value)}
-                  className="border rounded px-2 py-1"
-                >
-                  <option value="">Prioridade: Todas</option>
-                  {priorityOptions.map((p, idx) => (
-                    <option key={idx} value={p}>{p}</option>
-                  ))}
-                </select>
-                <select
-                  value={adminFilterCategory}
-                  onChange={(e) => setAdminFilterCategory(e.target.value)}
-                  className="border rounded px-2 py-1"
-                >
-                  <option value="">Categoria: Todas</option>
-                  {categoryOptions.filter(cat => cat !== "+Novo").map((cat, idx) => (
-                    <option key={idx} value={cat}>{cat}</option>
-                  ))}
-                </select>
-                <select
-                  value={adminFilterAtendente}
-                  onChange={(e) => setAdminFilterAtendente(e.target.value)}
-                  className="border rounded px-2 py-1"
-                >
-                  <option value="">Atendente: Todos</option>
-                  {atendenteOptions.map((opt, idx) => (
-                    <option key={idx} value={opt}>{opt}</option>
-                  ))}
-                </select>
-              </div>
+            {/* Filtros adicionais (somente admin) */}
+            {currentUser && currentUser.email && ( // Exemplo: se o email for um dos de admin, mas aqui usamos currentUser.isAdmin definido em outro lugar
+              currentUser.isAdmin && (
+                <div className="flex flex-col sm:flex-row items-center gap-2">
+                  <select
+                    value={adminFilterPriority}
+                    onChange={(e) => setAdminFilterPriority(e.target.value)}
+                    className="border rounded px-2 py-1"
+                  >
+                    <option value="">Prioridade: Todas</option>
+                    {priorityOptions.map((p, idx) => (
+                      <option key={idx} value={p}>{p}</option>
+                    ))}
+                  </select>
+                  <select
+                    value={adminFilterCategory}
+                    onChange={(e) => setAdminFilterCategory(e.target.value)}
+                    className="border rounded px-2 py-1"
+                  >
+                    <option value="">Categoria: Todas</option>
+                    {categoryOptions.filter(cat => cat !== "+Novo").map((cat, idx) => (
+                      <option key={idx} value={cat}>{cat}</option>
+                    ))}
+                  </select>
+                  <select
+                    value={adminFilterAtendente}
+                    onChange={(e) => setAdminFilterAtendente(e.target.value)}
+                    className="border rounded px-2 py-1"
+                  >
+                    <option value="">Atendente: Todos</option>
+                    {atendenteOptions.map((opt, idx) => (
+                      <option key={idx} value={opt}>{opt}</option>
+                    ))}
+                  </select>
+                </div>
+              )
             )}
           </div>
 
           {/* Botão "Criar Novo Chamado" somente para usuários comuns */}
-          {!currentUser.isAdmin && (
+          {currentUser && !currentUser.isAdmin && (
             <div className="mb-4 flex justify-center">
               <button
                 onClick={() => setShowNewTicketForm(true)}
@@ -504,8 +521,6 @@ function App() {
                 onSendEmail={sendTicketUpdateEmail}
               />
             ) : (
-              // No componente TicketList, garanta que a consulta use:
-              // where("userId", "==", currentUser.uid)
               <TicketList
                 activeTab={activeTab}
                 currentUser={currentUser}
