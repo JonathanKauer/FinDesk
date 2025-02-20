@@ -7,7 +7,8 @@ import {
   onAuthStateChanged,
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
-  signOut
+  signOut,
+  sendPasswordResetEmail
 } from "firebase/auth";
 import { db, auth } from './firebase-config.js';
 
@@ -102,7 +103,7 @@ async function sendTicketUpdateEmail(ticket, updateDescription) {
   }
 }
 
-// Função para validar que o nome é composto e com iniciais maiúsculas
+// Função para validar que o nome é composto com iniciais maiúsculas
 function isValidSolicitanteName(name) {
   const parts = name.trim().split(/\s+/);
   if (parts.length < 2) return false;
@@ -211,13 +212,20 @@ function App() {
       });
   };
 
-  // Função para redefinir senha (pode ser aprimorada com sendPasswordResetEmail)
+  // Função para redefinir senha com sendPasswordResetEmail
   const handleResetPassword = () => {
     if (!loginEmail.trim()) {
       alert("Por favor, insira seu e-mail para redefinir a senha.");
       return;
     }
-    alert("Este fluxo ainda não está implementado.");
+    sendPasswordResetEmail(auth, loginEmail)
+      .then(() => {
+        alert("Um e-mail de redefinição de senha foi enviado para " + loginEmail);
+      })
+      .catch((error) => {
+        console.error("Erro ao redefinir senha:", error);
+        alert("Falha ao enviar e-mail de redefinição. Verifique se o e-mail está correto.");
+      });
   };
 
   // Função de criação de ticket com logs de depuração e validação do nome
