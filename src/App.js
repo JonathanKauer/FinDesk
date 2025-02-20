@@ -3,16 +3,17 @@ import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Helmet } from "react-helmet";
 import { collection, addDoc } from 'firebase/firestore';
-import { 
-  onAuthStateChanged, 
-  signInWithEmailAndPassword, 
-  createUserWithEmailAndPassword 
+import {
+  onAuthStateChanged,
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+  signOut
 } from "firebase/auth";
 import { db, auth } from './firebase-config.js';
 
 // Componentes de listagem
-import TicketList from './TicketList.js';         // Usuário comum
-import TicketListAdmin from './TicketListAdmin.js'; // Admin
+import TicketList from './TicketList.js';         // Para usuário comum
+import TicketListAdmin from './TicketListAdmin.js'; // Para admin
 
 // Opções para Cargo/Departamento
 const initialCargoOptions = [
@@ -36,7 +37,7 @@ const priorityOptions = [
   "Urgente (1 dia útil)"
 ];
 
-// Opções de atendentes (somente para admin)
+// Opções de atendentes (apenas para admin)
 const atendenteOptions = ["jonathan.kauer@guiainvest.com.br", "nayla.martins@guiainvest.com.br"];
 
 // Mapeamento de prioridade para dias úteis
@@ -105,13 +106,11 @@ function App() {
   // Estado de autenticação real
   const [currentUser, setCurrentUser] = useState(null);
 
-  // Estados para formulários de login e cadastro
+  // Estados para Login e Cadastro
   const [loginEmail, setLoginEmail] = useState("");
   const [loginPassword, setLoginPassword] = useState("");
   const [signupEmail, setSignupEmail] = useState("");
   const [signupPassword, setSignupPassword] = useState("");
-  
-  // Controle de tela: Login ou Cadastro
   const [isLoginScreen, setIsLoginScreen] = useState(true);
 
   // Controle de abas de tickets (Abertos/Concluídos)
@@ -122,7 +121,7 @@ function App() {
   const [adminFilterCategory, setAdminFilterCategory] = useState("");
   const [adminFilterAtendente, setAdminFilterAtendente] = useState("");
 
-  // Estados do formulário de criação de ticket
+  // Formulário de criação de ticket
   const [showNewTicketForm, setShowNewTicketForm] = useState(false);
   const [newTicketNome, setNewTicketNome] = useState("");
   const [cargoDepartamento, setCargoDepartamento] = useState("");
@@ -139,7 +138,7 @@ function App() {
     "+Novo"
   ]);
 
-  // PASSO 7: Persistência do estado de autenticação
+  // Mantém o usuário logado após recarregar
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       setCurrentUser(user);
@@ -147,7 +146,7 @@ function App() {
     return () => unsubscribe();
   }, []);
 
-  // Handler para login com Firebase Auth
+  // Função de login
   const handleLoginSubmit = (e) => {
     e.preventDefault();
     if (!loginEmail.trim() || !loginPassword.trim()) {
@@ -166,14 +165,13 @@ function App() {
       });
   };
 
-  // Handler para cadastro, permitindo apenas emails do domínio @guiainvest.com.br
+  // Função de cadastro (apenas para emails do domínio @guiainvest.com.br)
   const handleSignUp = (e) => {
     e.preventDefault();
     if (!signupEmail.trim() || !signupPassword.trim()) {
       alert("Por favor, preencha todos os campos de cadastro.");
       return;
     }
-    // Validação de domínio
     if (!signupEmail.toLowerCase().endsWith("@guiainvest.com.br")) {
       alert("Somente emails do domínio @guiainvest.com.br são permitidos.");
       return;
@@ -192,18 +190,45 @@ function App() {
       });
   };
 
-  // Handler para criação de ticket (Passo 4: associar ticket ao UID real)
-  const handleCreateTicket = async (e) => {
-    e.preventDefault();
-    if (!newTicketNome.trim()) {
-      alert("Insira o nome completo do solicitante.");
+  // Função de logout
+  const handleLogout = () => {
+    signOut(auth)
+      .then(() => {
+        setCurrentUser(null);
+      })
+      .catch((error) => {
+        console.error("Erro ao deslogar:", error);
+      });
+  };
+
+  // Função para redefinir senha (exemplo com sendPasswordResetEmail pode ser implementada)
+  const handleResetPassword = () => {
+    if (!loginEmail.trim()) {
+      alert("Por favor, insira seu e-mail para redefinir a senha.");
       return;
     }
+    // Aqui, você pode usar sendPasswordResetEmail(auth, loginEmail)
+    alert("Este fluxo ainda não está implementado.");
+  };
+
+  // Função de criação de ticket com logs de depuração
+  const handleCreateTicket = async (e) => {
+    e.preventDefault();
+    console.log("Iniciando criação do chamado...");
+
+    if (!newTicketNome.trim()) {
+      alert("Insira o nome completo do solicitante.");
+      console.log("Criação abortada: campo de nome vazio.");
+      return;
+    }
+
     const user = auth.currentUser;
     if (!user) {
       alert("Você precisa estar logado para criar um ticket.");
+      console.log("Criação abortada: usuário não logado.");
       return;
     }
+
     const dataDeAbertura = new Date();
     const dataDeAberturaISO = dataDeAbertura.toISOString();
     const dataDeAberturaDisplay = dataDeAbertura.toLocaleString();
@@ -216,7 +241,7 @@ function App() {
       id: generateTicketId(),
       nomeSolicitante: newTicketNome,
       emailSolicitante: user.email,
-      userId: user.uid, // Associação real
+      userId: user.uid,
       cargoDepartamento,
       descricaoProblema,
       categoria,
@@ -233,14 +258,15 @@ function App() {
     };
 
     try {
+      console.log("Chamando addDoc...");
       await addDoc(collection(db, 'tickets'), newTicket);
       console.log("Ticket salvo no Firestore com sucesso!");
       sendTicketUpdateEmail(newTicket, "Abertura de novo chamado");
     } catch (error) {
-      console.error("Erro ao salvar ticket no Firestore:", error);
+      console.error("Erro ao criar ticket no Firestore:", error);
+      alert("Falha ao criar o ticket. Verifique o console para detalhes.");
     }
 
-    // Limpa o formulário e fecha
     setNewTicketNome("");
     setCargoDepartamento("");
     setDescricaoProblema("");
@@ -254,31 +280,6 @@ function App() {
     setNewTicketFiles(Array.from(e.target.files));
   };
 
-  // Logout handler
-  const handleLogout = () => {
-    auth.signOut();
-    setCurrentUser(null);
-  };
-
-  // Handler para redefinir senha (exemplo simplificado)
-  const handleResetPassword = () => {
-    if (!loginEmail.trim()) {
-      alert("Por favor, insira seu e-mail para redefinir a senha.");
-      return;
-    }
-    const newPass = prompt("Digite sua nova senha:");
-    if (!newPass?.trim()) {
-      alert("Nova senha inválida!");
-      return;
-    }
-    const confirmPass = prompt("Confirme sua nova senha:");
-    if (newPass !== confirmPass) {
-      alert("As senhas não coincidem!");
-      return;
-    }
-    alert("No primeiro acesso, sua senha será cadastrada automaticamente.");
-  };
-
   return (
     <div className="min-h-screen bg-gray-100 relative p-4" style={{ color: "#0E1428" }}>
       <Helmet>
@@ -286,7 +287,6 @@ function App() {
         <link rel="icon" href="/guiainvest-logo.png" />
       </Helmet>
 
-      {/* Cabeçalho (logo e título) */}
       <div className="flex flex-col items-center mb-4">
         <img src="/logo.png" alt="FinDesk Logo" className="h-12 mb-2" />
         <motion.h1
@@ -298,7 +298,6 @@ function App() {
         </motion.h1>
       </div>
 
-      {/* Se o usuário não estiver logado, exibe a tela de Login ou Cadastro */}
       {!currentUser && (
         <div className="flex items-center justify-center">
           {isLoginScreen ? (
@@ -383,7 +382,6 @@ function App() {
         </div>
       )}
 
-      {/* Se o usuário estiver logado, exibe a aplicação principal */}
       {currentUser && (
         <>
           <div className="absolute top-4 right-4">
@@ -418,7 +416,6 @@ function App() {
               </button>
             </div>
 
-            {/* Filtros adicionais para admin */}
             {currentUser.isAdmin && (
               <div className="flex flex-col sm:flex-row items-center gap-2">
                 <select
@@ -455,8 +452,7 @@ function App() {
             )}
           </div>
 
-          {/* Botão para "Criar Novo Chamado" (apenas para usuários comuns) */}
-          {currentUser && !currentUser.isAdmin && (
+          {!currentUser.isAdmin && (
             <div className="mb-4 flex justify-center">
               <button
                 onClick={() => setShowNewTicketForm(true)}
@@ -468,7 +464,6 @@ function App() {
             </div>
           )}
 
-          {/* Formulário de criação de chamado */}
           {showNewTicketForm && (
             <motion.form
               className="bg-white shadow p-4 rounded-2xl w-full max-w-lg mx-auto mb-4"
@@ -577,7 +572,6 @@ function App() {
             </motion.form>
           )}
 
-          {/* Lista de tickets */}
           <div className="mt-8 w-full max-w-5xl mx-auto">
             {currentUser.isAdmin ? (
               <TicketListAdmin
