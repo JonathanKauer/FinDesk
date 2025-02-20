@@ -3,7 +3,11 @@ import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Helmet } from "react-helmet";
 import { collection, addDoc } from 'firebase/firestore';
-import { onAuthStateChanged, signInWithEmailAndPassword } from "firebase/auth";
+import { 
+  onAuthStateChanged, 
+  signInWithEmailAndPassword, 
+  createUserWithEmailAndPassword 
+} from "firebase/auth";
 import { db, auth } from './firebase-config.js';
 
 // Componentes de listagem
@@ -32,10 +36,10 @@ const priorityOptions = [
   "Urgente (1 dia útil)"
 ];
 
-// Opções de atendentes (apenas para admin)
+// Opções de atendentes (somente para admin)
 const atendenteOptions = ["jonathan.kauer@guiainvest.com.br", "nayla.martins@guiainvest.com.br"];
 
-// Mapeamento prioridade -> dias úteis
+// Mapeamento de prioridade para dias úteis
 const priorityDaysMapping = {
   "Baixa (7 dias úteis)": 7,
   "Média (5 dias úteis)": 5,
@@ -64,7 +68,6 @@ function generateTicketId() {
   return id;
 }
 
-// Exemplo de envio de e-mail
 async function sendTicketUpdateEmail(ticket, updateDescription) {
   const subject = "Findesk: Atualização em chamado";
   const body =
@@ -99,12 +102,19 @@ async function sendTicketUpdateEmail(ticket, updateDescription) {
 }
 
 function App() {
-  // currentUser: usuário real logado pelo Firebase Auth
+  // Estado de autenticação real
   const [currentUser, setCurrentUser] = useState(null);
+
+  // Estados para formulários de login e cadastro
   const [loginEmail, setLoginEmail] = useState("");
   const [loginPassword, setLoginPassword] = useState("");
+  const [signupEmail, setSignupEmail] = useState("");
+  const [signupPassword, setSignupPassword] = useState("");
+  
+  // Controle de tela: Login ou Cadastro
+  const [isLoginScreen, setIsLoginScreen] = useState(true);
 
-  // Controle de abas (Abertos/Concluídos)
+  // Controle de abas de tickets (Abertos/Concluídos)
   const [activeTab, setActiveTab] = useState("open");
 
   // Filtros de admin
@@ -112,7 +122,7 @@ function App() {
   const [adminFilterCategory, setAdminFilterCategory] = useState("");
   const [adminFilterAtendente, setAdminFilterAtendente] = useState("");
 
-  // Formulário de novo chamado
+  // Estados do formulário de criação de ticket
   const [showNewTicketForm, setShowNewTicketForm] = useState(false);
   const [newTicketNome, setNewTicketNome] = useState("");
   const [cargoDepartamento, setCargoDepartamento] = useState("");
@@ -129,17 +139,15 @@ function App() {
     "+Novo"
   ]);
 
-  // ---------------------------
-  // PASSO 7: Persistência do login real com onAuthStateChanged
+  // PASSO 7: Persistência do estado de autenticação
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       setCurrentUser(user);
     });
     return () => unsubscribe();
   }, []);
-  // ---------------------------
 
-  // Lógica de login com Firebase Auth (PASSO 3)
+  // Handler para login com Firebase Auth
   const handleLoginSubmit = (e) => {
     e.preventDefault();
     if (!loginEmail.trim() || !loginPassword.trim()) {
@@ -148,10 +156,7 @@ function App() {
     }
     signInWithEmailAndPassword(auth, loginEmail, loginPassword)
       .then((userCredential) => {
-        // O Firebase Auth fornece o usuário autenticado
-        const user = userCredential.user;
-        console.log("Usuário logado com sucesso:", user.uid);
-        // currentUser será atualizado pelo onAuthStateChanged
+        console.log("Usuário logado com sucesso:", userCredential.user.uid);
         setLoginEmail("");
         setLoginPassword("");
       })
@@ -161,14 +166,39 @@ function App() {
       });
   };
 
-  // Criação de ticket (PASSO 4: associar ticket ao UID real)
+  // Handler para cadastro, permitindo apenas emails do domínio @guiainvest.com.br
+  const handleSignUp = (e) => {
+    e.preventDefault();
+    if (!signupEmail.trim() || !signupPassword.trim()) {
+      alert("Por favor, preencha todos os campos de cadastro.");
+      return;
+    }
+    // Validação de domínio
+    if (!signupEmail.toLowerCase().endsWith("@guiainvest.com.br")) {
+      alert("Somente emails do domínio @guiainvest.com.br são permitidos.");
+      return;
+    }
+    createUserWithEmailAndPassword(auth, signupEmail, signupPassword)
+      .then((userCredential) => {
+        console.log("Usuário criado com sucesso:", userCredential.user.uid);
+        alert("Conta criada com sucesso! Faça login para continuar.");
+        setIsLoginScreen(true);
+        setSignupEmail("");
+        setSignupPassword("");
+      })
+      .catch((error) => {
+        console.error("Erro ao criar conta:", error);
+        alert("Falha ao criar conta. Verifique os dados e tente novamente.");
+      });
+  };
+
+  // Handler para criação de ticket (Passo 4: associar ticket ao UID real)
   const handleCreateTicket = async (e) => {
     e.preventDefault();
     if (!newTicketNome.trim()) {
       alert("Insira o nome completo do solicitante.");
       return;
     }
-    // Certifique-se de que o usuário está logado de verdade
     const user = auth.currentUser;
     if (!user) {
       alert("Você precisa estar logado para criar um ticket.");
@@ -186,7 +216,7 @@ function App() {
       id: generateTicketId(),
       nomeSolicitante: newTicketNome,
       emailSolicitante: user.email,
-      userId: user.uid, // ASSOCIAÇÃO REAL do ticket ao UID
+      userId: user.uid, // Associação real
       cargoDepartamento,
       descricaoProblema,
       categoria,
@@ -224,13 +254,13 @@ function App() {
     setNewTicketFiles(Array.from(e.target.files));
   };
 
-  // Logout (usa auth.signOut)
+  // Logout handler
   const handleLogout = () => {
     auth.signOut();
     setCurrentUser(null);
   };
 
-  // Redefinir senha (exemplo simplificado)
+  // Handler para redefinir senha (exemplo simplificado)
   const handleResetPassword = () => {
     if (!loginEmail.trim()) {
       alert("Por favor, insira seu e-mail para redefinir a senha.");
@@ -256,7 +286,7 @@ function App() {
         <link rel="icon" href="/guiainvest-logo.png" />
       </Helmet>
 
-      {/* Cabeçalho (logo + título) */}
+      {/* Cabeçalho (logo e título) */}
       <div className="flex flex-col items-center mb-4">
         <img src="/logo.png" alt="FinDesk Logo" className="h-12 mb-2" />
         <motion.h1
@@ -268,53 +298,95 @@ function App() {
         </motion.h1>
       </div>
 
-      {/* Se não logado, tela de login */}
+      {/* Se o usuário não estiver logado, exibe a tela de Login ou Cadastro */}
       {!currentUser && (
         <div className="flex items-center justify-center">
-          <form onSubmit={handleLoginSubmit} className="bg-white shadow p-4 rounded-2xl w-full max-w-md">
-            <h2 className="text-xl font-bold mb-4 text-center">Faça seu login</h2>
-            <div className="mb-2">
-              <label className="block font-semibold">E-mail:</label>
-              <input
-                type="email"
-                value={loginEmail}
-                onChange={(e) => setLoginEmail(e.target.value)}
-                required
-                className="border rounded px-2 py-1 w-full"
-                placeholder="Digite seu e-mail"
-              />
-            </div>
-            <div className="mb-2">
-              <label className="block font-semibold">Senha:</label>
-              <input
-                type="password"
-                value={loginPassword}
-                onChange={(e) => setLoginPassword(e.target.value)}
-                required
-                className="border rounded px-2 py-1 w-full"
-              />
-              <small className="text-gray-500" style={{ fontSize: "0.75rem" }}>
-                No primeiro acesso, sua senha será cadastrada automaticamente.
-              </small>
-            </div>
-            <div className="flex justify-between mt-4">
-              <button type="submit" className="px-3 py-1 rounded shadow" style={{ backgroundColor: "#0E1428", color: "white" }}>
-                Entrar
+          {isLoginScreen ? (
+            <form onSubmit={handleLoginSubmit} className="bg-white shadow p-4 rounded-2xl w-full max-w-md">
+              <h2 className="text-xl font-bold mb-4 text-center">Faça seu login</h2>
+              <div className="mb-2">
+                <label className="block font-semibold">E-mail:</label>
+                <input
+                  type="email"
+                  value={loginEmail}
+                  onChange={(e) => setLoginEmail(e.target.value)}
+                  required
+                  className="border rounded px-2 py-1 w-full"
+                  placeholder="Digite seu e-mail"
+                />
+              </div>
+              <div className="mb-2">
+                <label className="block font-semibold">Senha:</label>
+                <input
+                  type="password"
+                  value={loginPassword}
+                  onChange={(e) => setLoginPassword(e.target.value)}
+                  required
+                  className="border rounded px-2 py-1 w-full"
+                />
+                <small className="text-gray-500" style={{ fontSize: "0.75rem" }}>
+                  No primeiro acesso, sua senha será cadastrada automaticamente.
+                </small>
+              </div>
+              <div className="flex justify-between mt-4">
+                <button type="submit" className="px-3 py-1 rounded shadow" style={{ backgroundColor: "#0E1428", color: "white" }}>
+                  Entrar
+                </button>
+                <button
+                  type="button"
+                  onClick={handleResetPassword}
+                  className="px-3 py-1 rounded shadow"
+                  style={{ backgroundColor: "#FF5E00", color: "white" }}
+                >
+                  Redefinir senha
+                </button>
+              </div>
+              <p className="mt-4 text-center">
+                Não tem conta?{" "}
+                <button type="button" onClick={() => setIsLoginScreen(false)} className="text-blue-500">
+                  Cadastre-se
+                </button>
+              </p>
+            </form>
+          ) : (
+            <form onSubmit={handleSignUp} className="bg-white shadow p-4 rounded-2xl w-full max-w-md">
+              <h2 className="text-xl font-bold mb-4 text-center">Crie sua conta</h2>
+              <div className="mb-2">
+                <label className="block font-semibold">E-mail:</label>
+                <input
+                  type="email"
+                  value={signupEmail}
+                  onChange={(e) => setSignupEmail(e.target.value)}
+                  required
+                  className="border rounded px-2 py-1 w-full"
+                  placeholder="Digite seu e-mail (@guiainvest.com.br)"
+                />
+              </div>
+              <div className="mb-2">
+                <label className="block font-semibold">Senha:</label>
+                <input
+                  type="password"
+                  value={signupPassword}
+                  onChange={(e) => setSignupPassword(e.target.value)}
+                  required
+                  className="border rounded px-2 py-1 w-full"
+                />
+              </div>
+              <button type="submit" className="w-full px-3 py-1 rounded shadow" style={{ backgroundColor: "#0E1428", color: "white" }}>
+                Criar Conta
               </button>
-              <button
-                type="button"
-                onClick={handleResetPassword}
-                className="px-3 py-1 rounded shadow"
-                style={{ backgroundColor: "#FF5E00", color: "white" }}
-              >
-                Redefinir senha
-              </button>
-            </div>
-          </form>
+              <p className="mt-4 text-center">
+                Já tem conta?{" "}
+                <button type="button" onClick={() => setIsLoginScreen(true)} className="text-blue-500">
+                  Faça login
+                </button>
+              </p>
+            </form>
+          )}
         </div>
       )}
 
-      {/* Se logado, mostra o restante da aplicação */}
+      {/* Se o usuário estiver logado, exibe a aplicação principal */}
       {currentUser && (
         <>
           <div className="absolute top-4 right-4">
@@ -349,46 +421,44 @@ function App() {
               </button>
             </div>
 
-            {/* Filtros adicionais (somente admin) */}
-            {currentUser && currentUser.email && ( // Exemplo: se o email for um dos de admin, mas aqui usamos currentUser.isAdmin definido em outro lugar
-              currentUser.isAdmin && (
-                <div className="flex flex-col sm:flex-row items-center gap-2">
-                  <select
-                    value={adminFilterPriority}
-                    onChange={(e) => setAdminFilterPriority(e.target.value)}
-                    className="border rounded px-2 py-1"
-                  >
-                    <option value="">Prioridade: Todas</option>
-                    {priorityOptions.map((p, idx) => (
-                      <option key={idx} value={p}>{p}</option>
-                    ))}
-                  </select>
-                  <select
-                    value={adminFilterCategory}
-                    onChange={(e) => setAdminFilterCategory(e.target.value)}
-                    className="border rounded px-2 py-1"
-                  >
-                    <option value="">Categoria: Todas</option>
-                    {categoryOptions.filter(cat => cat !== "+Novo").map((cat, idx) => (
-                      <option key={idx} value={cat}>{cat}</option>
-                    ))}
-                  </select>
-                  <select
-                    value={adminFilterAtendente}
-                    onChange={(e) => setAdminFilterAtendente(e.target.value)}
-                    className="border rounded px-2 py-1"
-                  >
-                    <option value="">Atendente: Todos</option>
-                    {atendenteOptions.map((opt, idx) => (
-                      <option key={idx} value={opt}>{opt}</option>
-                    ))}
-                  </select>
-                </div>
-              )
+            {/* Filtros adicionais para admin */}
+            {currentUser.isAdmin && (
+              <div className="flex flex-col sm:flex-row items-center gap-2">
+                <select
+                  value={adminFilterPriority}
+                  onChange={(e) => setAdminFilterPriority(e.target.value)}
+                  className="border rounded px-2 py-1"
+                >
+                  <option value="">Prioridade: Todas</option>
+                  {priorityOptions.map((p, idx) => (
+                    <option key={idx} value={p}>{p}</option>
+                  ))}
+                </select>
+                <select
+                  value={adminFilterCategory}
+                  onChange={(e) => setAdminFilterCategory(e.target.value)}
+                  className="border rounded px-2 py-1"
+                >
+                  <option value="">Categoria: Todas</option>
+                  {categoryOptions.filter(cat => cat !== "+Novo").map((cat, idx) => (
+                    <option key={idx} value={cat}>{cat}</option>
+                  ))}
+                </select>
+                <select
+                  value={adminFilterAtendente}
+                  onChange={(e) => setAdminFilterAtendente(e.target.value)}
+                  className="border rounded px-2 py-1"
+                >
+                  <option value="">Atendente: Todos</option>
+                  {atendenteOptions.map((opt, idx) => (
+                    <option key={idx} value={opt}>{opt}</option>
+                  ))}
+                </select>
+              </div>
             )}
           </div>
 
-          {/* Botão "Criar Novo Chamado" somente para usuários comuns */}
+          {/* Botão para "Criar Novo Chamado" (apenas para usuários comuns) */}
           {currentUser && !currentUser.isAdmin && (
             <div className="mb-4 flex justify-center">
               <button
@@ -510,7 +580,7 @@ function App() {
             </motion.form>
           )}
 
-          {/* Renderiza a lista de tickets */}
+          {/* Lista de tickets */}
           <div className="mt-8 w-full max-w-5xl mx-auto">
             {currentUser.isAdmin ? (
               <TicketListAdmin
