@@ -13,10 +13,13 @@ import {
 import { db, auth } from './firebase-config.js';
 
 // Componentes de listagem
-import TicketList from './TicketList.js';         // Para usuário comum
+import TicketList from './TicketList.js';         // Para usuário comum (com possibilidade de edição, a ser ajustada)
 import TicketListAdmin from './TicketListAdmin.js'; // Para admin
 
-// Opções para Cargo/Departamento
+// Configurações e constantes
+const ADMIN_DEFAULT_PASSWORD = "admin123@guiainvestgpt"; // Senha padrão para admins
+const adminEmails = ["jonathan.kauer@guiainvest.com.br", "nayla.martins@guiainvest.com.br"];
+
 const initialCargoOptions = [
   "Aquisição",
   "Backoffice",
@@ -30,7 +33,6 @@ const initialCargoOptions = [
   "+Novo"
 ];
 
-// Opções de prioridade
 const priorityOptions = [
   "Baixa (7 dias úteis)",
   "Média (5 dias úteis)",
@@ -38,10 +40,8 @@ const priorityOptions = [
   "Urgente (1 dia útil)"
 ];
 
-// Opções de atendentes (apenas para admin)
 const atendenteOptions = ["jonathan.kauer@guiainvest.com.br", "nayla.martins@guiainvest.com.br"];
 
-// Mapeamento de prioridade para dias úteis
 const priorityDaysMapping = {
   "Baixa (7 dias úteis)": 7,
   "Média (5 dias úteis)": 5,
@@ -103,7 +103,7 @@ async function sendTicketUpdateEmail(ticket, updateDescription) {
   }
 }
 
-// Função para validar que o nome é composto com iniciais maiúsculas
+// Função para validar que o nome do solicitante é composto e as iniciais estão em maiúsculas
 function isValidSolicitanteName(name) {
   const parts = name.trim().split(/\s+/);
   if (parts.length < 2) return false;
@@ -149,15 +149,21 @@ function App() {
     "+Novo"
   ]);
 
-  // Mantém o usuário logado após recarregar
+  // Persistência do login: usa onAuthStateChanged
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
-      setCurrentUser(user);
+      if (user) {
+        // Recupera a flag de admin armazenada no localStorage
+        const storedAdmin = localStorage.getItem("isAdmin") === "true";
+        setCurrentUser({ ...user, isAdmin: storedAdmin });
+      } else {
+        setCurrentUser(null);
+      }
     });
     return () => unsubscribe();
   }, []);
 
-  // Função de login
+  // Função de login com verificação de senha padrão para admin
   const handleLoginSubmit = (e) => {
     e.preventDefault();
     if (!loginEmail.trim() || !loginPassword.trim()) {
@@ -166,7 +172,14 @@ function App() {
     }
     signInWithEmailAndPassword(auth, loginEmail, loginPassword)
       .then((userCredential) => {
-        console.log("Usuário logado com sucesso:", userCredential.user.uid);
+        const user = userCredential.user;
+        const isDefaultAdmin =
+          adminEmails.includes(loginEmail.toLowerCase()) &&
+          loginPassword === ADMIN_DEFAULT_PASSWORD;
+        console.log("Usuário logado com sucesso:", user.uid, "isAdmin:", isDefaultAdmin);
+        // Armazena a flag de admin no localStorage
+        localStorage.setItem("isAdmin", isDefaultAdmin ? "true" : "false");
+        setCurrentUser({ ...user, isAdmin: isDefaultAdmin });
         setLoginEmail("");
         setLoginPassword("");
       })
@@ -228,7 +241,7 @@ function App() {
       });
   };
 
-  // Função de criação de ticket com logs de depuração e validação do nome
+  // Função de criação de ticket com validação do nome e logs de depuração
   const handleCreateTicket = async (e) => {
     e.preventDefault();
     console.log("Iniciando criação do chamado...");
@@ -238,7 +251,6 @@ function App() {
       console.log("Criação abortada: campo de nome vazio.");
       return;
     }
-
     if (!isValidSolicitanteName(newTicketNome)) {
       alert("Por favor, insira um nome composto com as iniciais em maiúsculas.");
       console.log("Criação abortada: nome inválido.");
