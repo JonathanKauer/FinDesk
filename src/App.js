@@ -10,14 +10,15 @@ import {
   signOut,
   sendPasswordResetEmail
 } from "firebase/auth";
-import { db, auth } from './firebase-config.js';
+import { db, auth, storage } from './firebase-config.js';
+import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 
 // Componentes de listagem
-import TicketList from './TicketList.js';         // Para usuário comum (com possibilidade de edição, a ser ajustada)
+import TicketList from './TicketList.js';         // Para usuário comum
 import TicketListAdmin from './TicketListAdmin.js'; // Para admin
 
-// Configurações e constantes
-const ADMIN_DEFAULT_PASSWORD = "admin123@guiainvestgpt"; // Senha padrão para admins
+// Constantes de admin
+const ADMIN_DEFAULT_PASSWORD = "admin123@guiainvestgpt";
 const adminEmails = ["jonathan.kauer@guiainvest.com.br", "nayla.martins@guiainvest.com.br"];
 
 const initialCargoOptions = [
@@ -103,7 +104,7 @@ async function sendTicketUpdateEmail(ticket, updateDescription) {
   }
 }
 
-// Função para validar que o nome do solicitante é composto e as iniciais estão em maiúsculas
+// Função para validar que o nome é composto com iniciais maiúsculas
 function isValidSolicitanteName(name) {
   const parts = name.trim().split(/\s+/);
   if (parts.length < 2) return false;
@@ -114,25 +115,20 @@ function isValidSolicitanteName(name) {
 }
 
 function App() {
-  // Estado de autenticação real
   const [currentUser, setCurrentUser] = useState(null);
 
-  // Estados para Login e Cadastro
   const [loginEmail, setLoginEmail] = useState("");
   const [loginPassword, setLoginPassword] = useState("");
   const [signupEmail, setSignupEmail] = useState("");
   const [signupPassword, setSignupPassword] = useState("");
   const [isLoginScreen, setIsLoginScreen] = useState(true);
 
-  // Controle de abas de tickets (Abertos/Concluídos)
   const [activeTab, setActiveTab] = useState("open");
 
-  // Filtros de admin
   const [adminFilterPriority, setAdminFilterPriority] = useState("");
   const [adminFilterCategory, setAdminFilterCategory] = useState("");
   const [adminFilterAtendente, setAdminFilterAtendente] = useState("");
 
-  // Formulário de criação de ticket
   const [showNewTicketForm, setShowNewTicketForm] = useState(false);
   const [newTicketNome, setNewTicketNome] = useState("");
   const [cargoDepartamento, setCargoDepartamento] = useState("");
@@ -149,11 +145,11 @@ function App() {
     "+Novo"
   ]);
 
-  // Persistência do login: usa onAuthStateChanged
+  // Persistência do login
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       if (user) {
-        // Recupera a flag de admin armazenada no localStorage
+        // Se o email for de admin e a senha padrão foi usada, a flag de admin pode ser definida
         const storedAdmin = localStorage.getItem("isAdmin") === "true";
         setCurrentUser({ ...user, isAdmin: storedAdmin });
       } else {
@@ -163,7 +159,6 @@ function App() {
     return () => unsubscribe();
   }, []);
 
-  // Função de login com verificação de senha padrão para admin
   const handleLoginSubmit = (e) => {
     e.preventDefault();
     if (!loginEmail.trim() || !loginPassword.trim()) {
@@ -177,7 +172,6 @@ function App() {
           adminEmails.includes(loginEmail.toLowerCase()) &&
           loginPassword === ADMIN_DEFAULT_PASSWORD;
         console.log("Usuário logado com sucesso:", user.uid, "isAdmin:", isDefaultAdmin);
-        // Armazena a flag de admin no localStorage
         localStorage.setItem("isAdmin", isDefaultAdmin ? "true" : "false");
         setCurrentUser({ ...user, isAdmin: isDefaultAdmin });
         setLoginEmail("");
@@ -189,7 +183,6 @@ function App() {
       });
   };
 
-  // Função de cadastro (apenas para emails do domínio @guiainvest.com.br)
   const handleSignUp = (e) => {
     e.preventDefault();
     if (!signupEmail.trim() || !signupPassword.trim()) {
@@ -214,7 +207,6 @@ function App() {
       });
   };
 
-  // Função de logout
   const handleLogout = () => {
     signOut(auth)
       .then(() => {
@@ -225,7 +217,6 @@ function App() {
       });
   };
 
-  // Função para redefinir senha com sendPasswordResetEmail
   const handleResetPassword = () => {
     if (!loginEmail.trim()) {
       alert("Por favor, insira seu e-mail para redefinir a senha.");
@@ -241,7 +232,7 @@ function App() {
       });
   };
 
-  // Função de criação de ticket com validação do nome e logs de depuração
+  // Função de criação de ticket com upload de anexos
   const handleCreateTicket = async (e) => {
     e.preventDefault();
     console.log("Iniciando criação do chamado...");
@@ -264,6 +255,7 @@ function App() {
       return;
     }
 
+    const ticketId = generateTicketId();
     const dataDeAbertura = new Date();
     const dataDeAberturaISO = dataDeAbertura.toISOString();
     const dataDeAberturaDisplay = dataDeAbertura.toLocaleString();
@@ -272,8 +264,23 @@ function App() {
     const prazoFinalizacaoDate = addBusinessDays(dataDeAbertura, daysToAdd);
     const prazoFinalizacao = prazoFinalizacaoDate.toISOString();
 
+    // Upload dos anexos para o Firebase Storage
+    let attachmentURLs = [];
+    if (newTicketFiles.length > 0) {
+      for (const file of newTicketFiles) {
+        try {
+          const storageRef = ref(storage, `tickets/${ticketId}/${file.name}`);
+          await uploadBytes(storageRef, file);
+          const downloadURL = await getDownloadURL(storageRef);
+          attachmentURLs.push({ url: downloadURL, name: file.name });
+        } catch (error) {
+          console.error("Erro ao fazer upload do arquivo:", error);
+        }
+      }
+    }
+
     const newTicket = {
-      id: generateTicketId(),
+      id: ticketId,
       nomeSolicitante: newTicketNome,
       emailSolicitante: user.email,
       userId: user.uid,
@@ -289,7 +296,7 @@ function App() {
       sla: "",
       responsavel: "",
       comentarios: [],
-      attachments: newTicketFiles,
+      attachments: attachmentURLs,
     };
 
     try {
@@ -555,32 +562,12 @@ function App() {
               </div>
               <div className="mb-2">
                 <label className="block font-semibold">Categoria:</label>
-                <select
-                  value={categoria}
-                  onChange={(e) => {
-                    if (e.target.value === "+Novo") {
-                      const novaCategoria = prompt("Digite a nova categoria:");
-                      if (novaCategoria) {
-                        const filtered = categoryOptions.filter(opt => opt !== "+Novo");
-                        setCategoryOptions([...filtered, novaCategoria, "+Novo"]);
-                        setCategoria(novaCategoria);
-                      }
-                    } else {
-                      setCategoria(e.target.value);
-                    }
-                  }}
-                  required
-                  className="border rounded px-2 py-1 w-full"
-                >
-                  <option value="">Selecione</option>
-                  {categoryOptions.map((option, idx) => (
-                    <option key={idx} value={option}>{option}</option>
-                  ))}
-                </select>
+                <p className="py-1">{categoria || "Não definido"}</p>
               </div>
               <div className="mb-2">
                 <label className="block font-semibold">Prioridade:</label>
                 <select
+                  name="prioridade"
                   value={prioridade}
                   onChange={(e) => setPrioridade(e.target.value)}
                   required
