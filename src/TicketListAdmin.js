@@ -1,4 +1,3 @@
-// src/TicketListAdmin.jsx
 import React, { useState, useEffect } from 'react';
 import {
   collection,
@@ -180,7 +179,6 @@ const TicketListAdmin = ({
         if (isEditMode) {
           return (
             <div key={ticket.id} className="border rounded p-2 mb-2 bg-white">
-              {/* ID não é exibido para o Admin */}
               <label className="block mt-2 font-semibold">Descrição:</label>
               <textarea
                 className="border rounded px-2 py-1 w-full"
@@ -257,7 +255,6 @@ const TicketListAdmin = ({
         } else {
           return (
             <div key={ticket.id} className="border rounded p-2 mb-2 bg-white">
-              {/* Ordem de exibição para Admin */}
               <p><strong>Solicitante:</strong> {ticket.nomeSolicitante}</p>
               <p><strong>Cargo/Departamento:</strong> {ticket.cargoDepartamento}</p>
               <p><strong>Categoria:</strong> {ticket.categoria}</p>
