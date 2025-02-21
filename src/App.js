@@ -16,8 +16,6 @@ import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import TicketList from './TicketList.js';
 import TicketListAdmin from './TicketListAdmin.js';
 
-const adminEmails = ["jonathan.kauer@guiainvest.com.br", "nayla.martins@guiainvest.com.br"];
-
 const initialCargoOptions = [
   "Aquisição",
   "Backoffice",
@@ -66,7 +64,7 @@ function generateTicketId() {
   return id;
 }
 
-// Calcula a SLA com base na diferença entre data de abertura e de resolução
+// Calcula a SLA com base na diferença entre data de abertura e data de resolução
 function calculateSLA(dataDeAberturaISO, dataResolucaoISO) {
   const start = new Date(dataDeAberturaISO);
   const end = new Date(dataResolucaoISO);
@@ -79,6 +77,7 @@ function calculateSLA(dataDeAberturaISO, dataResolucaoISO) {
   return diffDays + " dia(s)";
 }
 
+// Envia e-mail (exemplo)
 async function sendTicketUpdateEmail(ticket, updateDescription) {
   const subject = "Findesk: Atualização em chamado";
   const body =
@@ -111,6 +110,7 @@ async function sendTicketUpdateEmail(ticket, updateDescription) {
   }
 }
 
+// Valida se o nome do solicitante é composto com iniciais maiúsculas
 function isValidSolicitanteName(name) {
   const parts = name.trim().split(/\s+/);
   if (parts.length < 2) return false;
@@ -127,15 +127,16 @@ function App() {
   const [signupEmail, setSignupEmail] = useState("");
   const [signupPassword, setSignupPassword] = useState("");
   const [isLoginScreen, setIsLoginScreen] = useState(true);
+
   const [activeTab, setActiveTab] = useState("open");
   const [modoAdmin, setModoAdmin] = useState(true);
 
-  // Filtros Admin
+  // Filtros admin
   const [adminFilterPriority, setAdminFilterPriority] = useState("");
   const [adminFilterCategory, setAdminFilterCategory] = useState("");
   const [adminFilterAtendente, setAdminFilterAtendente] = useState("");
 
-  // Formulário de criação
+  // Form de novo ticket
   const [showNewTicketForm, setShowNewTicketForm] = useState(false);
   const [newTicketNome, setNewTicketNome] = useState("");
   const [cargoDepartamento, setCargoDepartamento] = useState("");
@@ -155,7 +156,7 @@ function App() {
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       if (user) {
-        user.getIdTokenResult().then(idTokenResult => {
+        user.getIdTokenResult().then((idTokenResult) => {
           const isAdminClaim = !!idTokenResult.claims.admin;
           setCurrentUser({ ...user, isAdmin: isAdminClaim });
         });
@@ -166,6 +167,7 @@ function App() {
     return () => unsubscribe();
   }, []);
 
+  // Login
   const handleLoginSubmit = (e) => {
     e.preventDefault();
     if (!loginEmail.trim() || !loginPassword.trim()) {
@@ -188,6 +190,7 @@ function App() {
       });
   };
 
+  // SignUp
   const handleSignUp = (e) => {
     e.preventDefault();
     if (!signupEmail.trim() || !signupPassword.trim()) {
@@ -195,7 +198,7 @@ function App() {
       return;
     }
     if (!signupEmail.toLowerCase().endsWith("@guiainvest.com.br")) {
-      alert("Somente emails do domínio @guiainvest.com.br são permitidos.");
+      alert("Somente e-mails do domínio @guiainvest.com.br são permitidos.");
       return;
     }
     createUserWithEmailAndPassword(auth, signupEmail, signupPassword)
@@ -236,6 +239,7 @@ function App() {
       });
   };
 
+  // Criação de novo ticket
   const handleCreateTicket = async (e) => {
     e.preventDefault();
     if (!newTicketNome.trim()) {
@@ -243,9 +247,10 @@ function App() {
       return;
     }
     if (!isValidSolicitanteName(newTicketNome)) {
-      alert("Por favor, insira um nome composto com as iniciais em maiúsculas.");
+      alert("Por favor, insira um nome composto com iniciais maiúsculas.");
       return;
     }
+
     const user = auth.currentUser;
     if (!user) {
       alert("Você precisa estar logado para criar um ticket.");
@@ -303,6 +308,7 @@ function App() {
       alert("Falha ao criar o ticket.");
     }
 
+    // Limpa formulário
     setNewTicketNome("");
     setCargoDepartamento("");
     setDescricaoProblema("");
@@ -453,7 +459,6 @@ function App() {
                 className="px-3 py-1 rounded shadow"
                 style={{ backgroundColor: modoAdmin ? "#0E1428" : "#FF5E00", color: "white" }}
               >
-                {/* ALterar rótulo conforme solicitado */}
                 {modoAdmin ? "Alterar visão para Usuário" : "Alterar visão para Admin"}
               </button>
             </div>
@@ -657,6 +662,7 @@ function App() {
                 filterAtendente={adminFilterAtendente}
                 onSendEmail={sendTicketUpdateEmail}
                 calculateSLA={calculateSLA}
+                currentUser={currentUser} // <-- Passa para o admin
               />
             ) : (
               <TicketList
