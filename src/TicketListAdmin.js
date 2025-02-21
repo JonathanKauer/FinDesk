@@ -11,6 +11,8 @@ import {
 } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { db, storage } from './firebase-config.js';
+import { getDisplayNameForComment } from './utils.js'; // ou importe de onde você declarou
+// calculateSLA vem como prop, pra calcular SLA
 
 const TicketListAdmin = ({
   activeTab,
@@ -18,12 +20,11 @@ const TicketListAdmin = ({
   filterCategory,
   filterAtendente,
   onSendEmail,
-  calculateSLA
+  calculateSLA,
 }) => {
   const [tickets, setTickets] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  // Estado para controle de edição
   const [editTicketId, setEditTicketId] = useState(null);
   const [editStatus, setEditStatus] = useState("");
   const [editResponsavel, setEditResponsavel] = useState("");
@@ -38,34 +39,33 @@ const TicketListAdmin = ({
     const unsubscribe = onSnapshot(
       q,
       (snapshot) => {
-        let list = snapshot.docs.map((docSnap) => ({
+        let list = snapshot.docs.map(docSnap => ({
           id: docSnap.id,
           ...docSnap.data()
         }));
 
         if (filterPriority) {
-          list = list.filter((ticket) => ticket.prioridade === filterPriority);
+          list = list.filter((tk) => tk.prioridade === filterPriority);
         }
         if (filterCategory) {
-          list = list.filter((ticket) => ticket.categoria === filterCategory);
+          list = list.filter((tk) => tk.categoria === filterCategory);
         }
         if (filterAtendente) {
-          list = list.filter((ticket) => ticket.responsavel === filterAtendente);
+          list = list.filter((tk) => tk.responsavel === filterAtendente);
         }
 
+        // Filtro da aba
         if (activeTab === 'open') {
-          // Exibe apenas tickets não concluídos
-          list = list.filter((ticket) => ticket.status !== 'Concluído');
+          list = list.filter((tk) => tk.status !== 'Concluído');
         } else {
-          // Exibe apenas tickets concluídos
-          list = list.filter((ticket) => ticket.status === 'Concluído');
+          list = list.filter((tk) => tk.status === 'Concluído');
         }
 
         setTickets(list);
         setLoading(false);
       },
       (err) => {
-        console.error('Erro ao buscar tickets (admin):', err);
+        console.error("Erro ao buscar tickets (admin):", err);
         setLoading(false);
       }
     );
@@ -75,10 +75,10 @@ const TicketListAdmin = ({
   const handleDeleteTicket = async (ticketId) => {
     try {
       await deleteDoc(doc(db, 'tickets', ticketId));
-      console.log('Ticket deletado:', ticketId);
+      console.log("Ticket deletado:", ticketId);
     } catch (error) {
-      console.error('Erro ao deletar ticket:', error);
-      alert('Falha ao deletar ticket.');
+      console.error("Erro ao deletar ticket:", error);
+      alert("Falha ao deletar ticket.");
     }
   };
 
@@ -99,11 +99,8 @@ const TicketListAdmin = ({
     setEditFiles([]);
   };
 
-  // Quando admin salva edição
   const saveEditTicket = async (ticket) => {
     let newAttachments = ticket.attachments || [];
-
-    // Upload de novos arquivos
     if (editFiles.length > 0) {
       for (const file of editFiles) {
         try {
@@ -112,22 +109,26 @@ const TicketListAdmin = ({
           const downloadURL = await getDownloadURL(storageRef);
           newAttachments.push({ url: downloadURL, name: file.name });
         } catch (error) {
-          console.error('Erro ao fazer upload de arquivo:', error);
+          console.error("Erro ao fazer upload de arquivo:", error);
         }
       }
     }
 
     let newComentarios = ticket.comentarios || [];
     if (editComentario.trim()) {
-      // Armazena também o nome do admin e a data/hora
+      const autor = getDisplayNameForComment(ticket, { ...ticket, isAdmin: true, email: '' });
+      // *Mas aqui idealmente usamos o "currentUser" real.
+      // Se vc tiver o currentUser no app, passe como prop. Exemplo:
+      // getDisplayNameForComment(ticket, currentUser)
+      // Para simplificar, simulamos "Admin" abaixo:
       newComentarios.push({
-        autor: "Admin", // Você pode colocar o e-mail do admin aqui, se preferir
+        autor: "Admin", // ou "Jonathan Kauer"
         texto: editComentario,
         createdAt: new Date().toISOString()
       });
     }
 
-    // Se o admin definir Concluído, vamos preencher dataResolucao e sla
+    // Montar update
     const updateData = {
       attachments: newAttachments,
       comentarios: newComentarios,
@@ -135,19 +136,16 @@ const TicketListAdmin = ({
       responsavel: editResponsavel
     };
 
-    // Se o status for "Concluído", preencher dataResolucaoISO, dataResolucao e sla
+    // Se marcar como concluído, define dataResolucao e sla
     if (editStatus === "Concluído") {
       const now = new Date();
-      const isoNow = now.toISOString();
-      updateData.dataResolucaoISO = isoNow;
+      updateData.dataResolucaoISO = now.toISOString();
       updateData.dataResolucao = now.toLocaleString();
-      // Calcula SLA com base na dataDeAberturaISO (já existente no ticket)
       if (ticket.dataDeAberturaISO) {
-        const slaValue = calculateSLA(ticket.dataDeAberturaISO, isoNow);
-        updateData.sla = slaValue;
+        updateData.sla = calculateSLA(ticket.dataDeAberturaISO, updateData.dataResolucaoISO);
       }
     } else {
-      // Caso o admin volte o status para Aberto/Em Andamento, zera dataResolucao e sla
+      // Caso admin volte para "Aberto" ou "Em Andamento"
       updateData.dataResolucaoISO = "";
       updateData.dataResolucao = "";
       updateData.sla = "";
@@ -155,15 +153,11 @@ const TicketListAdmin = ({
 
     try {
       await updateDoc(doc(db, 'tickets', ticket.id), updateData);
-      console.log('Ticket atualizado:', ticket.id);
-
-      if (onSendEmail) {
-        onSendEmail({ ...ticket, ...updateData }, 'Ticket atualizado pelo admin');
-      }
+      if (onSendEmail) onSendEmail({ ...ticket, ...updateData }, "Ticket atualizado pelo admin");
       cancelEditTicket();
     } catch (error) {
-      console.error('Erro ao atualizar ticket:', error);
-      alert('Falha ao atualizar ticket.');
+      console.error("Erro ao atualizar ticket:", error);
+      alert("Falha ao atualizar ticket.");
     }
   };
 
@@ -173,140 +167,141 @@ const TicketListAdmin = ({
   return (
     <div>
       <h2 className="text-xl font-bold mb-4">Tickets Administrativos</h2>
-      {tickets.map((ticket) => (
-        <div key={ticket.id} className="border rounded p-2 mb-2 bg-white">
-          {editTicketId === ticket.id ? (
-            /* -------------- FORMULÁRIO DE EDIÇÃO PARA ADMIN -------------- */
-            <div>
-              <p><strong>ID:</strong> {ticket.id}</p>
+      {tickets.map((ticket) => {
+        const isConcluido = ticket.status === "Concluído";
 
-              <label className="block font-semibold mt-2">Status:</label>
-              <select
-                value={editStatus}
-                onChange={(e) => setEditStatus(e.target.value)}
-                className="border px-2 py-1 rounded w-full"
-              >
-                <option value="Aberto">Aberto</option>
-                <option value="Em Andamento">Em Andamento</option>
-                <option value="Concluído">Concluído</option>
-              </select>
-
-              <label className="block font-semibold mt-2">Responsável (Atendente):</label>
-              <select
-                value={editResponsavel}
-                onChange={(e) => setEditResponsavel(e.target.value)}
-                className="border px-2 py-1 rounded w-full"
-              >
-                <option value="">Não definido</option>
-                <option value="Jonathan Kauer">Jonathan Kauer</option>
-                <option value="Nayla Martins">Nayla Martins</option>
-              </select>
-
-              {/* Comentário adicional */}
-              <label className="block font-semibold mt-2">Adicionar Comentário (Admin):</label>
-              <textarea
-                className="border px-2 py-1 rounded w-full"
-                rows={2}
-                value={editComentario}
-                onChange={(e) => setEditComentario(e.target.value)}
-              />
-
-              {/* Adicionar anexos */}
-              <label className="block font-semibold mt-2">Anexar novos arquivos:</label>
-              <input
-                type="file"
-                multiple
-                onChange={(e) => setEditFiles(Array.from(e.target.files))}
-                className="mt-1"
-              />
-
-              <div className="flex gap-2 mt-4">
-                <button
-                  onClick={() => saveEditTicket(ticket)}
-                  className="px-2 py-1 bg-blue-500 text-white rounded"
+        return (
+          <div key={ticket.id} className="border rounded p-2 mb-2 bg-white">
+            {editTicketId === ticket.id ? (
+              /* -------------- FORM DE EDIÇÃO -------------- */
+              <div>
+                <p><strong>ID:</strong> {ticket.id}</p>
+                <label>Status:</label>
+                <select
+                  value={editStatus}
+                  onChange={(e) => setEditStatus(e.target.value)}
+                  className="border px-2 py-1 rounded w-full"
                 >
-                  Salvar
-                </button>
-                <button
-                  onClick={cancelEditTicket}
-                  className="px-2 py-1 bg-gray-300 rounded"
+                  <option value="Aberto">Aberto</option>
+                  <option value="Em Andamento">Em Andamento</option>
+                  <option value="Concluído">Concluído</option>
+                </select>
+
+                <label>Responsável (Atendente):</label>
+                <select
+                  value={editResponsavel}
+                  onChange={(e) => setEditResponsavel(e.target.value)}
+                  className="border px-2 py-1 rounded w-full"
                 >
-                  Cancelar
-                </button>
-              </div>
-            </div>
-          ) : (
-            /* -------------- VISUALIZAÇÃO NORMAL (LEITURA) -------------- */
-            <div>
-              <p><strong>ID:</strong> {ticket.id}</p>
-              <p><strong>Solicitante:</strong> {ticket.nomeSolicitante}</p>
-              <p><strong>Status:</strong> {ticket.status}</p>
-              <p><strong>Responsável (Atendente):</strong> {ticket.responsavel || "Não definido"}</p>
-              {/* Admin NÃO edita Prioridade e Descrição, mas as vê: */}
-              <p><strong>Prioridade:</strong> {ticket.prioridade}</p>
-              <p><strong>Data de Abertura:</strong> {ticket.dataDeAbertura}</p>
+                  <option value="">Não definido</option>
+                  <option value="Jonathan Kauer">Jonathan Kauer</option>
+                  <option value="Nayla Martins">Nayla Martins</option>
+                </select>
 
-              {/* Se já estiver concluído e existir dataResolucao, exibe */}
-              {ticket.status === "Concluído" && ticket.dataResolucao && (
-                <p><strong>Data de Encerramento:</strong> {ticket.dataResolucao}</p>
-              )}
-              {/* SLA */}
-              {ticket.status === "Concluído" && ticket.sla && (
-                <p><strong>SLA:</strong> {ticket.sla}</p>
-              )}
+                <label>Adicionar Comentário (Admin):</label>
+                <textarea
+                  className="border px-2 py-1 rounded w-full"
+                  rows={2}
+                  value={editComentario}
+                  onChange={(e) => setEditComentario(e.target.value)}
+                />
 
-              <p><strong>Descrição:</strong> {ticket.descricaoProblema}</p>
-              <p><strong>Categoria:</strong> {ticket.categoria}</p>
-              <p><strong>Cargo/Departamento:</strong> {ticket.cargoDepartamento}</p>
+                <label>Anexar novos arquivos:</label>
+                <input
+                  type="file"
+                  multiple
+                  onChange={(e) => setEditFiles(Array.from(e.target.files))}
+                  className="mt-1"
+                />
 
-              {/* Anexos */}
-              {ticket.attachments && ticket.attachments.length > 0 && (
-                <div>
-                  <strong>Anexos:</strong>
-                  <ul>
-                    {ticket.attachments.map((att, idx) => (
-                      <li key={idx}>
-                        <a href={att.url} target="_blank" rel="noopener noreferrer">
-                          {att.name}
-                        </a>
-                      </li>
-                    ))}
-                  </ul>
+                <div className="flex gap-2 mt-4">
+                  <button
+                    onClick={() => saveEditTicket(ticket)}
+                    className="px-2 py-1 bg-blue-500 text-white rounded"
+                  >
+                    Salvar
+                  </button>
+                  <button
+                    onClick={cancelEditTicket}
+                    className="px-2 py-1 bg-gray-300 rounded"
+                  >
+                    Cancelar
+                  </button>
                 </div>
-              )}
-
-              {/* Comentários: agora armazenam {autor, texto, createdAt} */}
-              {ticket.comentarios && ticket.comentarios.length > 0 && (
-                <div>
-                  <strong>Comentários:</strong>
-                  <ul style={{ fontSize: '0.9rem' }}>
-                    {ticket.comentarios.map((com, i) => (
-                      <li key={i} className="ml-4 list-disc">
-                        <strong>{com.autor}:</strong> {com.texto}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-
-              <div className="flex gap-2 mt-2">
-                <button
-                  onClick={() => startEditTicket(ticket)}
-                  className="px-2 py-1 bg-green-500 text-white rounded"
-                >
-                  Editar
-                </button>
-                <button
-                  onClick={() => handleDeleteTicket(ticket.id)}
-                  className="px-2 py-1 bg-red-500 text-white rounded"
-                >
-                  Excluir
-                </button>
               </div>
-            </div>
-          )}
-        </div>
-      ))}
+            ) : (
+              /* -------------- VISUALIZAÇÃO -------------- */
+              <div>
+                <p><strong>ID:</strong> {ticket.id}</p>
+                <p><strong>Solicitante:</strong> {ticket.nomeSolicitante}</p>
+                <p><strong>Status:</strong> {ticket.status}</p>
+                <p><strong>Responsável (Atendente):</strong> {ticket.responsavel || "Não definido"}</p>
+                <p><strong>Prioridade:</strong> {ticket.prioridade}</p>
+                <p><strong>Data de Abertura:</strong> {ticket.dataDeAbertura}</p>
+
+                {isConcluido && ticket.dataResolucao && (
+                  <p><strong>Data de Encerramento:</strong> {ticket.dataResolucao}</p>
+                )}
+                {isConcluido && ticket.sla && (
+                  <p><strong>SLA:</strong> {ticket.sla}</p>
+                )}
+
+                <p><strong>Descrição:</strong> {ticket.descricaoProblema}</p>
+                <p><strong>Categoria:</strong> {ticket.categoria}</p>
+                <p><strong>Cargo/Departamento:</strong> {ticket.cargoDepartamento}</p>
+
+                {/* Anexos */}
+                {ticket.attachments && ticket.attachments.length > 0 && (
+                  <div>
+                    <strong>Anexos:</strong>
+                    <ul>
+                      {ticket.attachments.map((att, i) => (
+                        <li key={i}>
+                          <a href={att.url} target="_blank" rel="noopener noreferrer">
+                            {att.name}
+                          </a>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                {/* Comentários */}
+                {ticket.comentarios && ticket.comentarios.length > 0 && (
+                  <div>
+                    <strong>Comentários:</strong>
+                    <ul style={{ fontSize: "0.9rem" }}>
+                      {ticket.comentarios.map((com, idx) => (
+                        <li key={idx} className="ml-4 list-disc">
+                          <strong>{com.autor}:</strong> {com.texto}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                {/* Se concluído, não mostra botão de Editar */}
+                {!isConcluido && (
+                  <div className="flex gap-2 mt-2">
+                    <button
+                      onClick={() => startEditTicket(ticket)}
+                      className="px-2 py-1 bg-green-500 text-white rounded"
+                    >
+                      Editar
+                    </button>
+                    <button
+                      onClick={() => handleDeleteTicket(ticket.id)}
+                      className="px-2 py-1 bg-red-500 text-white rounded"
+                    >
+                      Excluir
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 };
