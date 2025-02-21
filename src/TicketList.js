@@ -12,6 +12,13 @@ import {
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { db, storage } from './firebase-config.js';
 
+const priorityOptions = [
+  "Baixa (7 dias úteis)",
+  "Média (5 dias úteis)",
+  "Alta (2 dias úteis)",
+  "Urgente (1 dia útil)"
+];
+
 const TicketList = ({ currentUser, activeTab, onSendEmail, calculateSLA }) => {
   const [tickets, setTickets] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -54,13 +61,12 @@ const TicketList = ({ currentUser, activeTab, onSendEmail, calculateSLA }) => {
     return () => unsubscribe();
   }, [currentUser, activeTab]);
 
-  // Reabrir ticket (exemplo já existente)
   const handleReopenTicket = async (ticket) => {
     try {
-      const ticketRef = doc(db, 'tickets', ticket.id);
-      await updateDoc(ticketRef, {
+      await updateDoc(doc(db, 'tickets', ticket.id), {
         status: 'Aberto',
         dataResolucao: '',
+        dataResolucaoISO: '',
         sla: ''
       });
       if (onSendEmail) onSendEmail(ticket, 'Chamado reaberto');
@@ -70,16 +76,15 @@ const TicketList = ({ currentUser, activeTab, onSendEmail, calculateSLA }) => {
     }
   };
 
-  // Avaliar ticket (exemplo já existente)
   const handleEvaluateTicket = (ticket) => {
     const rating = prompt('Avalie o chamado (de 1 a 5):');
     if (rating) {
       alert(`Você avaliou o ticket ${ticket.id} com nota ${rating}.`);
-      // Aqui, você pode implementar a atualização do ticket com a avaliação, se desejar.
+      // Aqui, você poderia gravar essa avaliação no Firestore, se quiser.
     }
   };
 
-  // Iniciar edição (carrega dados no formulário)
+  // Iniciar edição
   const startEditTicket = (ticket) => {
     setEditTicketId(ticket.id);
     setEditDescricao(ticket.descricaoProblema || "");
@@ -88,7 +93,6 @@ const TicketList = ({ currentUser, activeTab, onSendEmail, calculateSLA }) => {
     setEditFiles([]);
   };
 
-  // Cancelar edição
   const cancelEditTicket = () => {
     setEditTicketId(null);
     setEditDescricao("");
@@ -97,10 +101,10 @@ const TicketList = ({ currentUser, activeTab, onSendEmail, calculateSLA }) => {
     setEditFiles([]);
   };
 
-  // Salvar edição do ticket
   const saveEditTicket = async (ticket) => {
-    // Upload de novos anexos
     let newAttachments = ticket.attachments || [];
+
+    // Upload de novos anexos
     if (editFiles.length > 0) {
       for (const file of editFiles) {
         try {
@@ -114,10 +118,15 @@ const TicketList = ({ currentUser, activeTab, onSendEmail, calculateSLA }) => {
       }
     }
 
-    // Comentários
     let newComentarios = ticket.comentarios || [];
     if (editComentario.trim()) {
-      newComentarios.push(editComentario);
+      // Armazena com o “nome” ou e-mail do usuário comum
+      const autorDoComentario = currentUser.email || "Usuário";
+      newComentarios.push({
+        autor: autorDoComentario,
+        texto: editComentario,
+        createdAt: new Date().toISOString()
+      });
     }
 
     const updateData = {
@@ -129,7 +138,9 @@ const TicketList = ({ currentUser, activeTab, onSendEmail, calculateSLA }) => {
 
     try {
       await updateDoc(doc(db, 'tickets', ticket.id), updateData);
-      if (onSendEmail) onSendEmail({ ...ticket, ...updateData }, 'Chamado editado pelo usuário');
+      if (onSendEmail) {
+        onSendEmail({ ...ticket, ...updateData }, 'Chamado editado pelo usuário');
+      }
       cancelEditTicket();
     } catch (error) {
       console.error('Erro ao atualizar ticket:', error);
@@ -146,16 +157,21 @@ const TicketList = ({ currentUser, activeTab, onSendEmail, calculateSLA }) => {
       {tickets.map((ticket) => (
         <div key={ticket.id} className="border rounded p-2 mb-2 bg-white">
           {editTicketId === ticket.id ? (
-            // Form de edição do usuário
+            /* -------------- FORMULÁRIO DE EDIÇÃO PARA USUÁRIO COMUM -------------- */
             <div>
               <p><strong>Status:</strong> {ticket.status}</p>
+
               <label className="block font-semibold mt-2">Prioridade:</label>
-              <input
-                type="text"
+              <select
                 className="border px-2 py-1 rounded w-full"
                 value={editPrioridade}
                 onChange={(e) => setEditPrioridade(e.target.value)}
-              />
+              >
+                <option value="">Selecione</option>
+                {priorityOptions.map((opt, idx) => (
+                  <option key={idx} value={opt}>{opt}</option>
+                ))}
+              </select>
 
               <label className="block font-semibold mt-2">Descrição do Problema:</label>
               <textarea
@@ -197,19 +213,20 @@ const TicketList = ({ currentUser, activeTab, onSendEmail, calculateSLA }) => {
               </div>
             </div>
           ) : (
-            // Visualização comum
+            /* -------------- VISUALIZAÇÃO NORMAL -------------- */
             <div>
               <p><strong>Status:</strong> {ticket.status}</p>
               <p><strong>Prioridade:</strong> {ticket.prioridade}</p>
               <p><strong>Data de Abertura:</strong> {ticket.dataDeAbertura}</p>
-              {ticket.status === 'Concluído' &&
-                ticket.dataDeAberturaISO &&
-                ticket.dataResolucaoISO && (
-                  <p>
-                    <strong>SLA:</strong>{' '}
-                    {calculateSLA(ticket.dataDeAberturaISO, ticket.dataResolucaoISO)}
-                  </p>
+
+              {/* Se estiver concluído e tiver dataResolucao, exibe */}
+              {ticket.status === 'Concluído' && ticket.dataResolucao && (
+                <p><strong>Data de Encerramento:</strong> {ticket.dataResolucao}</p>
               )}
+              {ticket.status === 'Concluído' && ticket.sla && (
+                <p><strong>SLA:</strong> {ticket.sla}</p>
+              )}
+
               <p><strong>Descrição:</strong> {ticket.descricaoProblema}</p>
 
               {/* Anexos */}
@@ -232,15 +249,17 @@ const TicketList = ({ currentUser, activeTab, onSendEmail, calculateSLA }) => {
               {ticket.comentarios && ticket.comentarios.length > 0 && (
                 <div>
                   <strong>Comentários:</strong>
-                  <ul>
+                  <ul style={{ fontSize: '0.9rem' }}>
                     {ticket.comentarios.map((com, i) => (
-                      <li key={i} className="ml-4 list-disc">{com}</li>
+                      <li key={i} className="ml-4 list-disc">
+                        <strong>{com.autor}:</strong> {com.texto}
+                      </li>
                     ))}
                   </ul>
                 </div>
               )}
 
-              {ticket.status === 'Concluído' && (
+              {ticket.status === 'Concluído' ? (
                 <div className="mt-2 flex gap-2">
                   <button
                     onClick={() => handleReopenTicket(ticket)}
@@ -255,10 +274,7 @@ const TicketList = ({ currentUser, activeTab, onSendEmail, calculateSLA }) => {
                     Avaliar Chamado
                   </button>
                 </div>
-              )}
-
-              {/* Se o ticket NÃO estiver concluído, pode editar */}
-              {ticket.status !== 'Concluído' && (
+              ) : (
                 <div className="mt-2">
                   <button
                     onClick={() => startEditTicket(ticket)}
