@@ -12,6 +12,9 @@ import {
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { db, storage } from './firebase-config.js';
 
+import { StarRating, getDisplayNameForComment } from './utils.js'; 
+// Importe de onde estiver seu StarRating e getDisplayNameForComment
+
 const priorityOptions = [
   "Baixa (7 dias úteis)",
   "Média (5 dias úteis)",
@@ -23,16 +26,21 @@ const TicketList = ({ currentUser, activeTab, onSendEmail, calculateSLA }) => {
   const [tickets, setTickets] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  // Estados para edição do usuário comum
+  // Edição do usuário
   const [editTicketId, setEditTicketId] = useState(null);
   const [editDescricao, setEditDescricao] = useState("");
   const [editPrioridade, setEditPrioridade] = useState("");
   const [editComentario, setEditComentario] = useState("");
   const [editFiles, setEditFiles] = useState([]);
 
+  // Para avaliação via estrelas
+  const [showEvaluation, setShowEvaluation] = useState(false);
+  const [ratingValue, setRatingValue] = useState(0);
+  const [ticketToEvaluate, setTicketToEvaluate] = useState(null);
+
   useEffect(() => {
     if (!currentUser) return;
-    // Busca os tickets do usuário
+
     const q = query(
       collection(db, 'tickets'),
       where('userId', '==', currentUser.uid),
@@ -41,50 +49,84 @@ const TicketList = ({ currentUser, activeTab, onSendEmail, calculateSLA }) => {
     const unsubscribe = onSnapshot(
       q,
       (snapshot) => {
-        const all = snapshot.docs.map((docSnap) => ({
+        const all = snapshot.docs.map(docSnap => ({
           id: docSnap.id,
           ...docSnap.data()
         }));
-        // Filtra pela aba (aberto/concluído)
-        const filtered =
-          activeTab === 'open'
-            ? all.filter((ticket) => ticket.status !== 'Concluído')
-            : all.filter((ticket) => ticket.status === 'Concluído');
+        const filtered = (activeTab === 'open')
+          ? all.filter((tk) => tk.status !== 'Concluído')
+          : all.filter((tk) => tk.status === 'Concluído');
         setTickets(filtered);
         setLoading(false);
       },
       (err) => {
-        console.error('Erro ao buscar tickets (usuário):', err);
+        console.error("Erro ao buscar tickets (usuário):", err);
         setLoading(false);
       }
     );
     return () => unsubscribe();
   }, [currentUser, activeTab]);
 
+  // ---- Reabrir Chamado (Exige motivo) ----
   const handleReopenTicket = async (ticket) => {
+    const reason = prompt("Descreva o motivo da reabertura:");
+    if (!reason || !reason.trim()) {
+      alert("É necessário informar o motivo para reabrir o chamado.");
+      return;
+    }
+
+    let newComentarios = ticket.comentarios || [];
+    // Autor = nomeSolicitante
+    const autor = ticket.nomeSolicitante || "Usuário";
+    newComentarios.push({
+      autor,
+      texto: `**Reabertura**: ${reason}`,
+      createdAt: new Date().toISOString()
+    });
+
+    const updateData = {
+      status: 'Aberto',
+      dataResolucao: '',
+      dataResolucaoISO: '',
+      sla: '',
+      comentarios: newComentarios
+    };
+
     try {
-      await updateDoc(doc(db, 'tickets', ticket.id), {
-        status: 'Aberto',
-        dataResolucao: '',
-        dataResolucaoISO: '',
-        sla: ''
-      });
-      if (onSendEmail) onSendEmail(ticket, 'Chamado reaberto');
+      await updateDoc(doc(db, 'tickets', ticket.id), updateData);
+      if (onSendEmail) onSendEmail({ ...ticket, ...updateData }, "Chamado reaberto");
     } catch (error) {
-      console.error('Erro ao reabrir ticket:', error);
-      alert('Falha ao reabrir o ticket.');
+      console.error("Erro ao reabrir ticket:", error);
+      alert("Falha ao reabrir o ticket.");
     }
   };
 
+  // ---- Avaliar Chamado (Estrelas) ----
   const handleEvaluateTicket = (ticket) => {
-    const rating = prompt('Avalie o chamado (de 1 a 5):');
-    if (rating) {
-      alert(`Você avaliou o ticket ${ticket.id} com nota ${rating}.`);
-      // Aqui, você poderia gravar essa avaliação no Firestore, se quiser.
-    }
+    setTicketToEvaluate(ticket);
+    setRatingValue(ticket.avaliacao || 0);
+    setShowEvaluation(true);
   };
 
-  // Iniciar edição
+  const saveEvaluation = async () => {
+    if (!ticketToEvaluate) return;
+    // Salva no Firestore em "avaliacao"
+    const updateData = {
+      avaliacao: ratingValue
+    };
+    try {
+      await updateDoc(doc(db, 'tickets', ticketToEvaluate.id), updateData);
+      if (onSendEmail) onSendEmail({ ...ticketToEvaluate, ...updateData }, "Chamado avaliado pelo usuário");
+    } catch (error) {
+      console.error("Erro ao avaliar ticket:", error);
+      alert("Falha ao avaliar o ticket.");
+    }
+    setShowEvaluation(false);
+    setTicketToEvaluate(null);
+    setRatingValue(0);
+  };
+
+  // ---- Edição do Ticket (Usuário) ----
   const startEditTicket = (ticket) => {
     setEditTicketId(ticket.id);
     setEditDescricao(ticket.descricaoProblema || "");
@@ -92,7 +134,6 @@ const TicketList = ({ currentUser, activeTab, onSendEmail, calculateSLA }) => {
     setEditComentario("");
     setEditFiles([]);
   };
-
   const cancelEditTicket = () => {
     setEditTicketId(null);
     setEditDescricao("");
@@ -103,8 +144,6 @@ const TicketList = ({ currentUser, activeTab, onSendEmail, calculateSLA }) => {
 
   const saveEditTicket = async (ticket) => {
     let newAttachments = ticket.attachments || [];
-
-    // Upload de novos anexos
     if (editFiles.length > 0) {
       for (const file of editFiles) {
         try {
@@ -113,17 +152,16 @@ const TicketList = ({ currentUser, activeTab, onSendEmail, calculateSLA }) => {
           const downloadURL = await getDownloadURL(storageRef);
           newAttachments.push({ url: downloadURL, name: file.name });
         } catch (error) {
-          console.error('Erro ao fazer upload de arquivo:', error);
+          console.error("Erro ao fazer upload de arquivo:", error);
         }
       }
     }
 
     let newComentarios = ticket.comentarios || [];
     if (editComentario.trim()) {
-      // Armazena com o “nome” ou e-mail do usuário comum
-      const autorDoComentario = currentUser.email || "Usuário";
+      // autor = nomeSolicitante
       newComentarios.push({
-        autor: autorDoComentario,
+        autor: ticket.nomeSolicitante || "Usuário",
         texto: editComentario,
         createdAt: new Date().toISOString()
       });
@@ -138,13 +176,11 @@ const TicketList = ({ currentUser, activeTab, onSendEmail, calculateSLA }) => {
 
     try {
       await updateDoc(doc(db, 'tickets', ticket.id), updateData);
-      if (onSendEmail) {
-        onSendEmail({ ...ticket, ...updateData }, 'Chamado editado pelo usuário');
-      }
+      if (onSendEmail) onSendEmail({ ...ticket, ...updateData }, "Chamado editado pelo usuário");
       cancelEditTicket();
     } catch (error) {
-      console.error('Erro ao atualizar ticket:', error);
-      alert('Falha ao atualizar o ticket.');
+      console.error("Erro ao atualizar ticket:", error);
+      alert("Falha ao atualizar o ticket.");
     }
   };
 
@@ -154,140 +190,182 @@ const TicketList = ({ currentUser, activeTab, onSendEmail, calculateSLA }) => {
   return (
     <div>
       <h2 className="text-xl font-bold mb-4">Meus Chamados</h2>
-      {tickets.map((ticket) => (
-        <div key={ticket.id} className="border rounded p-2 mb-2 bg-white">
-          {editTicketId === ticket.id ? (
-            /* -------------- FORMULÁRIO DE EDIÇÃO PARA USUÁRIO COMUM -------------- */
-            <div>
-              <p><strong>Status:</strong> {ticket.status}</p>
 
-              <label className="block font-semibold mt-2">Prioridade:</label>
-              <select
-                className="border px-2 py-1 rounded w-full"
-                value={editPrioridade}
-                onChange={(e) => setEditPrioridade(e.target.value)}
+      {/* Modal/Aba de Avaliação com Estrelas */}
+      {showEvaluation && ticketToEvaluate && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center">
+          <div className="bg-white p-4 rounded">
+            <h3 className="font-bold text-lg mb-2">Avaliar Chamado</h3>
+            <StarRating rating={ratingValue} setRating={setRatingValue} readOnly={false} />
+            <div className="mt-4 flex gap-2 justify-end">
+              <button
+                onClick={() => {
+                  setShowEvaluation(false);
+                  setTicketToEvaluate(null);
+                }}
+                className="px-3 py-1 bg-gray-300 rounded"
               >
-                <option value="">Selecione</option>
-                {priorityOptions.map((opt, idx) => (
-                  <option key={idx} value={opt}>{opt}</option>
-                ))}
-              </select>
-
-              <label className="block font-semibold mt-2">Descrição do Problema:</label>
-              <textarea
-                className="border px-2 py-1 rounded w-full"
-                rows={3}
-                value={editDescricao}
-                onChange={(e) => setEditDescricao(e.target.value)}
-              />
-
-              <label className="block font-semibold mt-2">Adicionar Comentário:</label>
-              <textarea
-                className="border px-2 py-1 rounded w-full"
-                rows={2}
-                value={editComentario}
-                onChange={(e) => setEditComentario(e.target.value)}
-              />
-
-              <label className="block font-semibold mt-2">Anexar novos arquivos:</label>
-              <input
-                type="file"
-                multiple
-                onChange={(e) => setEditFiles(Array.from(e.target.files))}
-                className="mt-1"
-              />
-
-              <div className="flex gap-2 mt-4">
-                <button
-                  onClick={() => saveEditTicket(ticket)}
-                  className="px-2 py-1 bg-blue-500 text-white rounded"
-                >
-                  Salvar
-                </button>
-                <button
-                  onClick={cancelEditTicket}
-                  className="px-2 py-1 bg-gray-300 rounded"
-                >
-                  Cancelar
-                </button>
-              </div>
+                Cancelar
+              </button>
+              <button
+                onClick={saveEvaluation}
+                className="px-3 py-1 bg-blue-500 text-white rounded"
+              >
+                Salvar Avaliação
+              </button>
             </div>
-          ) : (
-            /* -------------- VISUALIZAÇÃO NORMAL -------------- */
-            <div>
-              <p><strong>Status:</strong> {ticket.status}</p>
-              <p><strong>Prioridade:</strong> {ticket.prioridade}</p>
-              <p><strong>Data de Abertura:</strong> {ticket.dataDeAbertura}</p>
-
-              {/* Se estiver concluído e tiver dataResolucao, exibe */}
-              {ticket.status === 'Concluído' && ticket.dataResolucao && (
-                <p><strong>Data de Encerramento:</strong> {ticket.dataResolucao}</p>
-              )}
-              {ticket.status === 'Concluído' && ticket.sla && (
-                <p><strong>SLA:</strong> {ticket.sla}</p>
-              )}
-
-              <p><strong>Descrição:</strong> {ticket.descricaoProblema}</p>
-
-              {/* Anexos */}
-              {ticket.attachments && ticket.attachments.length > 0 && (
-                <div>
-                  <strong>Anexos:</strong>
-                  <ul>
-                    {ticket.attachments.map((att, idx) => (
-                      <li key={idx}>
-                        <a href={att.url} target="_blank" rel="noopener noreferrer">
-                          {att.name}
-                        </a>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-
-              {/* Comentários */}
-              {ticket.comentarios && ticket.comentarios.length > 0 && (
-                <div>
-                  <strong>Comentários:</strong>
-                  <ul style={{ fontSize: '0.9rem' }}>
-                    {ticket.comentarios.map((com, i) => (
-                      <li key={i} className="ml-4 list-disc">
-                        <strong>{com.autor}:</strong> {com.texto}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-
-              {ticket.status === 'Concluído' ? (
-                <div className="mt-2 flex gap-2">
-                  <button
-                    onClick={() => handleReopenTicket(ticket)}
-                    className="px-2 py-1 rounded bg-blue-500 text-white"
-                  >
-                    Reabrir Chamado
-                  </button>
-                  <button
-                    onClick={() => handleEvaluateTicket(ticket)}
-                    className="px-2 py-1 rounded bg-green-500 text-white"
-                  >
-                    Avaliar Chamado
-                  </button>
-                </div>
-              ) : (
-                <div className="mt-2">
-                  <button
-                    onClick={() => startEditTicket(ticket)}
-                    className="px-2 py-1 bg-green-500 text-white rounded"
-                  >
-                    Editar Chamado
-                  </button>
-                </div>
-              )}
-            </div>
-          )}
+          </div>
         </div>
-      ))}
+      )}
+
+      {tickets.map((ticket) => {
+        const isConcluido = ticket.status === "Concluído";
+        return (
+          <div key={ticket.id} className="border rounded p-2 mb-2 bg-white">
+            {editTicketId === ticket.id ? (
+              /* -------------- FORM DE EDIÇÃO -------------- */
+              <div>
+                <p><strong>Status:</strong> {ticket.status}</p>
+                <label>Prioridade:</label>
+                <select
+                  className="border px-2 py-1 rounded w-full"
+                  value={editPrioridade}
+                  onChange={(e) => setEditPrioridade(e.target.value)}
+                >
+                  <option value="">Selecione</option>
+                  {priorityOptions.map((opt, i) => (
+                    <option key={i} value={opt}>{opt}</option>
+                  ))}
+                </select>
+
+                <label>Descrição do Problema:</label>
+                <textarea
+                  className="border px-2 py-1 rounded w-full"
+                  rows={3}
+                  value={editDescricao}
+                  onChange={(e) => setEditDescricao(e.target.value)}
+                />
+
+                <label>Adicionar Comentário:</label>
+                <textarea
+                  className="border px-2 py-1 rounded w-full"
+                  rows={2}
+                  value={editComentario}
+                  onChange={(e) => setEditComentario(e.target.value)}
+                />
+
+                <label>Anexar novos arquivos:</label>
+                <input
+                  type="file"
+                  multiple
+                  onChange={(e) => setEditFiles(Array.from(e.target.files))}
+                />
+
+                <div className="flex gap-2 mt-4">
+                  <button
+                    onClick={() => saveEditTicket(ticket)}
+                    className="px-2 py-1 bg-blue-500 text-white rounded"
+                  >
+                    Salvar
+                  </button>
+                  <button
+                    onClick={cancelEditTicket}
+                    className="px-2 py-1 bg-gray-300 rounded"
+                  >
+                    Cancelar
+                  </button>
+                </div>
+              </div>
+            ) : (
+              /* -------------- VISUALIZAÇÃO -------------- */
+              <div>
+                <p><strong>Status:</strong> {ticket.status}</p>
+                <p><strong>Prioridade:</strong> {ticket.prioridade}</p>
+                <p><strong>Data de Abertura:</strong> {ticket.dataDeAbertura}</p>
+
+                {isConcluido && ticket.dataResolucao && (
+                  <p><strong>Data de Encerramento:</strong> {ticket.dataResolucao}</p>
+                )}
+                {isConcluido && ticket.sla && (
+                  <p><strong>SLA:</strong> {ticket.sla}</p>
+                )}
+
+                <p><strong>Descrição:</strong> {ticket.descricaoProblema}</p>
+
+                {/* Anexos */}
+                {ticket.attachments && ticket.attachments.length > 0 && (
+                  <div>
+                    <strong>Anexos:</strong>
+                    <ul>
+                      {ticket.attachments.map((att, idx) => (
+                        <li key={idx}>
+                          <a href={att.url} target="_blank" rel="noopener noreferrer">
+                            {att.name}
+                          </a>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                {/* Comentários */}
+                {ticket.comentarios && ticket.comentarios.length > 0 && (
+                  <div>
+                    <strong>Comentários:</strong>
+                    <ul style={{ fontSize: "0.9rem" }}>
+                      {ticket.comentarios.map((com, idx) => (
+                        <li key={idx} className="ml-4 list-disc">
+                          <strong>{com.autor}:</strong> {com.texto}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                {/* Botões de ação */}
+                {isConcluido ? (
+                  <div className="mt-2 flex gap-2">
+                    <button
+                      onClick={() => handleReopenTicket(ticket)}
+                      className="px-2 py-1 rounded bg-blue-500 text-white"
+                    >
+                      Reabrir Chamado
+                    </button>
+
+                    {/* Avaliação: se já tiver "avaliacao", exibe "Chamado Avaliado" */}
+                    {ticket.avaliacao ? (
+                      <div>
+                        <p className="inline-block mr-2">Chamado Avaliado:</p>
+                        <StarRating
+                          rating={ticket.avaliacao}
+                          setRating={() => {}}
+                          readOnly={true}
+                        />
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => handleEvaluateTicket(ticket)}
+                        className="px-2 py-1 rounded bg-green-500 text-white"
+                      >
+                        Avaliar Chamado
+                      </button>
+                    )}
+                  </div>
+                ) : (
+                  <div className="mt-2">
+                    <button
+                      onClick={() => startEditTicket(ticket)}
+                      className="px-2 py-1 bg-green-500 text-white rounded"
+                    >
+                      Editar Chamado
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 };
