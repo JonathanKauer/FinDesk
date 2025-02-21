@@ -11,8 +11,7 @@ import {
 } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { db, storage } from './firebase-config.js';
-import { StarRating } from './utils.js'; // se você quiser exibir avaliação em estrelas
-// import { getDisplayName } ... se quiser usar a lógica de "Jonathan Kauer" vs "Nayla Martins"
+import { StarRating } from './utils.js'; // se quiser exibir nota em estrelas
 
 const TicketListAdmin = ({
   activeTab,
@@ -75,7 +74,7 @@ const TicketListAdmin = ({
     return () => unsubscribe();
   }, [activeTab, filterPriority, filterCategory, filterAtendente]);
 
-  // Excluir Chamado (sempre disponível)
+  // Excluir Chamado
   const handleDeleteTicket = async (ticketId) => {
     try {
       await deleteDoc(doc(db, 'tickets', ticketId));
@@ -121,7 +120,7 @@ const TicketListAdmin = ({
 
     let newComentarios = ticket.comentarios || [];
     if (editComentario.trim()) {
-      // Se quiser mapear o e-mail do currentUser pra "Jonathan Kauer" etc., faça aqui
+      // Se quiser mapear email => "Jonathan Kauer" etc., faça aqui
       const autor = (currentUser && currentUser.email) || "Admin";
       newComentarios.push({
         autor,
@@ -146,7 +145,7 @@ const TicketListAdmin = ({
         updateData.sla = calculateSLA(ticket.dataDeAberturaISO, updateData.dataResolucaoISO);
       }
     } else {
-      // Se voltar para Aberto ou Em Andamento
+      // Se voltar para Aberto/Em Andamento
       updateData.dataResolucaoISO = "";
       updateData.dataResolucao = "";
       updateData.sla = "";
@@ -170,15 +169,15 @@ const TicketListAdmin = ({
   return (
     <div>
       <h2 className="text-xl font-bold mb-4">Tickets Administrativos</h2>
-      {tickets.map((ticket) => {
+      {tickets.map(ticket => {
         const isConcluido = (ticket.status === "Concluído");
 
-        // ---------- FORM DE EDIÇÃO (ADMIN) ----------
         if (editTicketId === ticket.id) {
+          // ------ FORM DE EDIÇÃO (ADMIN) ------
           return (
             <div key={ticket.id} className="border rounded p-2 mb-2 bg-white">
-              <p><strong>ID:</strong> {ticket.id}</p>
-
+              {/* ID não é mais exibido em visualização normal, 
+                  mas aqui no form podemos deixar ou remover, tanto faz */}
               <label className="block mt-2 font-semibold">Status:</label>
               <select
                 value={editStatus}
@@ -234,39 +233,34 @@ const TicketListAdmin = ({
           );
         }
 
-        // ---------- VISUALIZAÇÃO (ADMIN) ----------
+        // ------ VISUALIZAÇÃO (ADMIN) ------
         return (
           <div key={ticket.id} className="border rounded p-2 mb-2 bg-white">
-            <p><strong>ID:</strong> {ticket.id}</p>
+            {/* (1) Solicitante */}
+            <p><strong>Solicitante:</strong> {ticket.nomeSolicitante}</p>
 
-            {/* Vamos reorganizar para a mesma ordem principal: Descrição, DataAbertura, Prioridade, Status, Comentários, Anexos. 
-                MAS, como admin vê mais info, adicionamos Responsável, etc. conforme necessidade.
-            */}
-            
-            {/* Descrição */}
+            {/* (2) Cargo/Departamento */}
+            <p><strong>Cargo/Departamento:</strong> {ticket.cargoDepartamento}</p>
+
+            {/* (3) Categoria */}
+            <p><strong>Categoria:</strong> {ticket.categoria}</p>
+
+            {/* (4) Descrição */}
             <p><strong>Descrição:</strong> {ticket.descricaoProblema}</p>
 
-            {/* Data de Abertura */}
+            {/* (5) Data de Abertura */}
             <p><strong>Data de Abertura:</strong> {ticket.dataDeAbertura}</p>
 
-            {/* Prioridade */}
+            {/* (6) Prioridade */}
             <p><strong>Prioridade:</strong> {ticket.prioridade}</p>
 
-            {/* Status */}
-            <p><strong>Status:</strong> {ticket.status}</p>
-
-            {/* Responsável (Atendente) */}
+            {/* (7) Responsável */}
             <p><strong>Responsável:</strong> {ticket.responsavel || "Não definido"}</p>
 
-            {/* Se já estiver concluído, exibir data de encerramento e SLA */}
-            {ticket.dataResolucao && (
-              <p><strong>Data de Encerramento:</strong> {ticket.dataResolucao}</p>
-            )}
-            {ticket.sla && (
-              <p><strong>SLA:</strong> {ticket.sla}</p>
-            )}
+            {/* (8) Status */}
+            <p><strong>Status:</strong> {ticket.status}</p>
 
-            {/* Comentários */}
+            {/* (9) Comentários */}
             {ticket.comentarios && ticket.comentarios.length > 0 && (
               <div>
                 <strong>Comentários:</strong>
@@ -280,7 +274,7 @@ const TicketListAdmin = ({
               </div>
             )}
 
-            {/* Anexos (link azul, sublinhado, fonte menor) */}
+            {/* (10) Anexos (azul, sublinhado, fonte menor) */}
             {ticket.attachments && ticket.attachments.length > 0 && (
               <div>
                 <strong>Anexos:</strong>
@@ -305,16 +299,27 @@ const TicketListAdmin = ({
               </div>
             )}
 
-            {/* Avaliação do Usuário, se houver */}
+            {/* (11) Data de Encerramento (se concluído) */}
+            {ticket.dataResolucao && (
+              <p><strong>Data de Encerramento:</strong> {ticket.dataResolucao}</p>
+            )}
+
+            {/* (12) SLA (se concluído) */}
+            {ticket.sla && (
+              <p><strong>SLA:</strong> {ticket.sla}</p>
+            )}
+
+            {/* (13) Avaliação do Usuário (último item) */}
             {ticket.avaliacao && (
               <div>
-                <strong>Avaliação do Usuário: </strong>
+                <strong>Avaliação do Usuário:</strong>
                 <StarRating rating={ticket.avaliacao} setRating={() => {}} readOnly={true} />
               </div>
             )}
 
             {/* Botões de ação */}
             <div className="flex gap-2 mt-2">
+              {/* Editar só se não estiver concluído */}
               {!isConcluido && (
                 <button
                   onClick={() => startEditTicket(ticket)}
@@ -323,6 +328,7 @@ const TicketListAdmin = ({
                   Editar
                 </button>
               )}
+              {/* Excluir sempre */}
               <button
                 onClick={() => handleDeleteTicket(ticket.id)}
                 className="px-2 py-1 bg-red-500 text-white rounded"
