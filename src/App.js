@@ -104,7 +104,7 @@ async function sendTicketUpdateEmail(ticket, updateDescription) {
   }
 }
 
-// Função para validar que o nome do solicitante é composto com iniciais em maiúsculas
+// Declaração única da função de validação do nome do solicitante
 function isValidSolicitanteName(name) {
   const parts = name.trim().split(/\s+/);
   if (parts.length < 2) return false;
@@ -148,7 +148,7 @@ function App() {
     "+Novo"
   ]);
 
-  // Persistência do login
+  // Persistência do login via onAuthStateChanged
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       if (user) {
@@ -638,16 +638,6 @@ function App() {
       )}
     </div>
   );
-}
-
-// Função para validar que o nome do solicitante é composto com iniciais em maiúsculas
-function isValidSolicitanteName(name) {
-  const parts = name.trim().split(/\s+/);
-  if (parts.length < 2) return false;
-  for (const part of parts) {
-    if (part[0] !== part[0].toUpperCase()) return false;
-  }
-  return true;
 }
 
 export default App;
