@@ -12,8 +12,7 @@ import {
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { db, storage } from './firebase-config.js';
 
-import { StarRating, getDisplayNameForComment } from './utils.js'; 
-// Importe de onde estiver seu StarRating e getDisplayNameForComment
+import { StarRating } from './utils.js'; // ou { StarRating, getDisplayName }
 
 const priorityOptions = [
   "Baixa (7 dias úteis)",
@@ -26,21 +25,20 @@ const TicketList = ({ currentUser, activeTab, onSendEmail, calculateSLA }) => {
   const [tickets, setTickets] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  // Edição do usuário
+  // Edição
   const [editTicketId, setEditTicketId] = useState(null);
   const [editDescricao, setEditDescricao] = useState("");
   const [editPrioridade, setEditPrioridade] = useState("");
   const [editComentario, setEditComentario] = useState("");
   const [editFiles, setEditFiles] = useState([]);
 
-  // Para avaliação via estrelas
+  // Avaliação
   const [showEvaluation, setShowEvaluation] = useState(false);
   const [ratingValue, setRatingValue] = useState(0);
   const [ticketToEvaluate, setTicketToEvaluate] = useState(null);
 
   useEffect(() => {
     if (!currentUser) return;
-
     const q = query(
       collection(db, 'tickets'),
       where('userId', '==', currentUser.uid),
@@ -54,8 +52,8 @@ const TicketList = ({ currentUser, activeTab, onSendEmail, calculateSLA }) => {
           ...docSnap.data()
         }));
         const filtered = (activeTab === 'open')
-          ? all.filter((tk) => tk.status !== 'Concluído')
-          : all.filter((tk) => tk.status === 'Concluído');
+          ? all.filter(tk => tk.status !== 'Concluído')
+          : all.filter(tk => tk.status === 'Concluído');
         setTickets(filtered);
         setLoading(false);
       },
@@ -67,28 +65,24 @@ const TicketList = ({ currentUser, activeTab, onSendEmail, calculateSLA }) => {
     return () => unsubscribe();
   }, [currentUser, activeTab]);
 
-  // ---- Reabrir Chamado (Exige motivo) ----
+  // ---- REABRIR CHAMADO ----
   const handleReopenTicket = async (ticket) => {
     const reason = prompt("Descreva o motivo da reabertura:");
     if (!reason || !reason.trim()) {
       alert("É necessário informar o motivo para reabrir o chamado.");
       return;
     }
-
     let newComentarios = ticket.comentarios || [];
-    // Autor = nomeSolicitante
-    const autor = ticket.nomeSolicitante || "Usuário";
     newComentarios.push({
-      autor,
+      autor: ticket.nomeSolicitante || "Usuário",
       texto: `**Reabertura**: ${reason}`,
       createdAt: new Date().toISOString()
     });
-
     const updateData = {
-      status: 'Aberto',
-      dataResolucao: '',
-      dataResolucaoISO: '',
-      sla: '',
+      status: "Aberto",
+      dataResolucao: "",
+      dataResolucaoISO: "",
+      sla: "",
       comentarios: newComentarios
     };
 
@@ -101,7 +95,7 @@ const TicketList = ({ currentUser, activeTab, onSendEmail, calculateSLA }) => {
     }
   };
 
-  // ---- Avaliar Chamado (Estrelas) ----
+  // ---- AVALIAR CHAMADO (ESTRELAS) ----
   const handleEvaluateTicket = (ticket) => {
     setTicketToEvaluate(ticket);
     setRatingValue(ticket.avaliacao || 0);
@@ -110,13 +104,14 @@ const TicketList = ({ currentUser, activeTab, onSendEmail, calculateSLA }) => {
 
   const saveEvaluation = async () => {
     if (!ticketToEvaluate) return;
-    // Salva no Firestore em "avaliacao"
     const updateData = {
       avaliacao: ratingValue
     };
     try {
       await updateDoc(doc(db, 'tickets', ticketToEvaluate.id), updateData);
-      if (onSendEmail) onSendEmail({ ...ticketToEvaluate, ...updateData }, "Chamado avaliado pelo usuário");
+      if (onSendEmail) {
+        onSendEmail({ ...ticketToEvaluate, ...updateData }, "Chamado avaliado pelo usuário");
+      }
     } catch (error) {
       console.error("Erro ao avaliar ticket:", error);
       alert("Falha ao avaliar o ticket.");
@@ -126,7 +121,7 @@ const TicketList = ({ currentUser, activeTab, onSendEmail, calculateSLA }) => {
     setRatingValue(0);
   };
 
-  // ---- Edição do Ticket (Usuário) ----
+  // ---- EDIÇÃO (USER) ----
   const startEditTicket = (ticket) => {
     setEditTicketId(ticket.id);
     setEditDescricao(ticket.descricaoProblema || "");
@@ -159,7 +154,6 @@ const TicketList = ({ currentUser, activeTab, onSendEmail, calculateSLA }) => {
 
     let newComentarios = ticket.comentarios || [];
     if (editComentario.trim()) {
-      // autor = nomeSolicitante
       newComentarios.push({
         autor: ticket.nomeSolicitante || "Usuário",
         texto: editComentario,
@@ -176,7 +170,9 @@ const TicketList = ({ currentUser, activeTab, onSendEmail, calculateSLA }) => {
 
     try {
       await updateDoc(doc(db, 'tickets', ticket.id), updateData);
-      if (onSendEmail) onSendEmail({ ...ticket, ...updateData }, "Chamado editado pelo usuário");
+      if (onSendEmail) {
+        onSendEmail({ ...ticket, ...updateData }, "Chamado editado pelo usuário");
+      }
       cancelEditTicket();
     } catch (error) {
       console.error("Erro ao atualizar ticket:", error);
@@ -191,7 +187,7 @@ const TicketList = ({ currentUser, activeTab, onSendEmail, calculateSLA }) => {
     <div>
       <h2 className="text-xl font-bold mb-4">Meus Chamados</h2>
 
-      {/* Modal/Aba de Avaliação com Estrelas */}
+      {/* Modal de Avaliação com Estrelas */}
       {showEvaluation && ticketToEvaluate && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center">
           <div className="bg-white p-4 rounded">
@@ -202,6 +198,7 @@ const TicketList = ({ currentUser, activeTab, onSendEmail, calculateSLA }) => {
                 onClick={() => {
                   setShowEvaluation(false);
                   setTicketToEvaluate(null);
+                  setRatingValue(0);
                 }}
                 className="px-3 py-1 bg-gray-300 rounded"
               >
@@ -218,15 +215,17 @@ const TicketList = ({ currentUser, activeTab, onSendEmail, calculateSLA }) => {
         </div>
       )}
 
-      {tickets.map((ticket) => {
-        const isConcluido = ticket.status === "Concluído";
+      {tickets.map(ticket => {
+        const isConcluido = (ticket.status === "Concluído");
+
         return (
           <div key={ticket.id} className="border rounded p-2 mb-2 bg-white">
             {editTicketId === ticket.id ? (
-              /* -------------- FORM DE EDIÇÃO -------------- */
+              // ---------- FORM DE EDIÇÃO ----------
               <div>
                 <p><strong>Status:</strong> {ticket.status}</p>
-                <label>Prioridade:</label>
+
+                <label className="block mt-2">Prioridade:</label>
                 <select
                   className="border px-2 py-1 rounded w-full"
                   value={editPrioridade}
@@ -238,7 +237,7 @@ const TicketList = ({ currentUser, activeTab, onSendEmail, calculateSLA }) => {
                   ))}
                 </select>
 
-                <label>Descrição do Problema:</label>
+                <label className="block mt-2">Descrição do Problema:</label>
                 <textarea
                   className="border px-2 py-1 rounded w-full"
                   rows={3}
@@ -246,7 +245,7 @@ const TicketList = ({ currentUser, activeTab, onSendEmail, calculateSLA }) => {
                   onChange={(e) => setEditDescricao(e.target.value)}
                 />
 
-                <label>Adicionar Comentário:</label>
+                <label className="block mt-2">Adicionar Comentário:</label>
                 <textarea
                   className="border px-2 py-1 rounded w-full"
                   rows={2}
@@ -254,7 +253,7 @@ const TicketList = ({ currentUser, activeTab, onSendEmail, calculateSLA }) => {
                   onChange={(e) => setEditComentario(e.target.value)}
                 />
 
-                <label>Anexar novos arquivos:</label>
+                <label className="block mt-2">Anexar novos arquivos:</label>
                 <input
                   type="file"
                   multiple
@@ -277,22 +276,21 @@ const TicketList = ({ currentUser, activeTab, onSendEmail, calculateSLA }) => {
                 </div>
               </div>
             ) : (
-              /* -------------- VISUALIZAÇÃO -------------- */
+              // ---------- VISUALIZAÇÃO ----------
               <div>
                 <p><strong>Status:</strong> {ticket.status}</p>
                 <p><strong>Prioridade:</strong> {ticket.prioridade}</p>
                 <p><strong>Data de Abertura:</strong> {ticket.dataDeAbertura}</p>
 
-                {isConcluido && ticket.dataResolucao && (
+                {ticket.dataResolucao && (
                   <p><strong>Data de Encerramento:</strong> {ticket.dataResolucao}</p>
                 )}
-                {isConcluido && ticket.sla && (
+                {ticket.sla && (
                   <p><strong>SLA:</strong> {ticket.sla}</p>
                 )}
 
                 <p><strong>Descrição:</strong> {ticket.descricaoProblema}</p>
 
-                {/* Anexos */}
                 {ticket.attachments && ticket.attachments.length > 0 && (
                   <div>
                     <strong>Anexos:</strong>
@@ -308,11 +306,10 @@ const TicketList = ({ currentUser, activeTab, onSendEmail, calculateSLA }) => {
                   </div>
                 )}
 
-                {/* Comentários */}
                 {ticket.comentarios && ticket.comentarios.length > 0 && (
                   <div>
                     <strong>Comentários:</strong>
-                    <ul style={{ fontSize: "0.9rem" }}>
+                    <ul style={{ fontSize: '0.9rem' }}>
                       {ticket.comentarios.map((com, idx) => (
                         <li key={idx} className="ml-4 list-disc">
                           <strong>{com.autor}:</strong> {com.texto}
@@ -322,7 +319,6 @@ const TicketList = ({ currentUser, activeTab, onSendEmail, calculateSLA }) => {
                   </div>
                 )}
 
-                {/* Botões de ação */}
                 {isConcluido ? (
                   <div className="mt-2 flex gap-2">
                     <button
@@ -331,16 +327,11 @@ const TicketList = ({ currentUser, activeTab, onSendEmail, calculateSLA }) => {
                     >
                       Reabrir Chamado
                     </button>
-
-                    {/* Avaliação: se já tiver "avaliacao", exibe "Chamado Avaliado" */}
+                    {/* Avaliação */}
                     {ticket.avaliacao ? (
                       <div>
                         <p className="inline-block mr-2">Chamado Avaliado:</p>
-                        <StarRating
-                          rating={ticket.avaliacao}
-                          setRating={() => {}}
-                          readOnly={true}
-                        />
+                        <StarRating rating={ticket.avaliacao} setRating={()=>{}} readOnly={true} />
                       </div>
                     ) : (
                       <button
