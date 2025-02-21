@@ -9,13 +9,8 @@ import {
   updateDoc,
   deleteDoc
 } from 'firebase/firestore';
-import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { db, storage } from './firebase-config.js';
-
-// ReactQuill
-import ReactQuill from 'react-quill';
-import 'react-quill/dist/quill.snow.css';
-
 import { StarRating } from './utils.js';
 
 const priorityOptions = [
@@ -37,15 +32,14 @@ const TicketListAdmin = ({
   const [tickets, setTickets] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  // Edição do Admin
+  // Estados para edição do Admin
   const [editTicketId, setEditTicketId] = useState(null);
-
-  const [editDescricaoHTML, setEditDescricaoHTML] = useState("");  
-  const [editComentarioHTML, setEditComentarioHTML] = useState("");  
+  const [editDescricao, setEditDescricao] = useState("");
+  const [editComentario, setEditComentario] = useState("");
   const [editStatus, setEditStatus] = useState("");
   const [editResponsavel, setEditResponsavel] = useState("");
-  const [editFiles, setEditFiles] = useState([]);
   const [editPrioridade, setEditPrioridade] = useState("");
+  const [editFiles, setEditFiles] = useState([]);
 
   useEffect(() => {
     const q = query(
@@ -55,28 +49,25 @@ const TicketListAdmin = ({
     const unsubscribe = onSnapshot(
       q,
       (snapshot) => {
-        let list = snapshot.docs.map((docSnap) => ({
+        let list = snapshot.docs.map(docSnap => ({
           id: docSnap.id,
           ...docSnap.data()
         }));
 
-        // Filtros
         if (filterPriority) {
-          list = list.filter((tk) => tk.prioridade === filterPriority);
+          list = list.filter(ticket => ticket.prioridade === filterPriority);
         }
         if (filterCategory) {
-          list = list.filter((tk) => tk.categoria === filterCategory);
+          list = list.filter(ticket => ticket.categoria === filterCategory);
         }
         if (filterAtendente) {
-          list = list.filter((tk) => tk.responsavel === filterAtendente);
+          list = list.filter(ticket => ticket.responsavel === filterAtendente);
         }
-
         if (activeTab === 'open') {
-          list = list.filter((tk) => tk.status !== 'Concluído');
+          list = list.filter(ticket => ticket.status !== 'Concluído');
         } else {
-          list = list.filter((tk) => tk.status === 'Concluído');
+          list = list.filter(ticket => ticket.status === 'Concluído');
         }
-
         setTickets(list);
         setLoading(false);
       },
@@ -98,29 +89,27 @@ const TicketListAdmin = ({
     }
   };
 
-  // Iniciar Edição
+  // Iniciar Edição (Admin)
   const startEditTicket = (ticket) => {
     setEditTicketId(ticket.id);
-    setEditDescricaoHTML(ticket.descricaoProblema || "");
+    setEditDescricao(ticket.descricaoProblema || "");
+    setEditPrioridade(ticket.prioridade || "");
     setEditStatus(ticket.status || "");
     setEditResponsavel(ticket.responsavel || "");
-    setEditPrioridade(ticket.prioridade || "");
-    setEditComentarioHTML("");
+    setEditComentario("");
     setEditFiles([]);
   };
 
-  // Cancelar Edição
   const cancelEditTicket = () => {
     setEditTicketId(null);
-    setEditDescricaoHTML("");
-    setEditComentarioHTML("");
+    setEditDescricao("");
+    setEditPrioridade("");
     setEditStatus("");
     setEditResponsavel("");
-    setEditPrioridade("");
+    setEditComentario("");
     setEditFiles([]);
   };
 
-  // Salvar Edição
   const saveEditTicket = async (ticket) => {
     let newAttachments = ticket.attachments || [];
     if (editFiles.length > 0) {
@@ -135,26 +124,23 @@ const TicketListAdmin = ({
         }
       }
     }
-
     let newComentarios = ticket.comentarios || [];
-    if (editComentarioHTML.trim()) {
-      const autorAdmin = (currentUser && currentUser.email) || "Admin";
+    if (editComentario.trim()) {
+      const autor = (currentUser && currentUser.email) || "Admin";
       newComentarios.push({
-        autor: autorAdmin,
-        texto: editComentarioHTML, // HTML
+        autor,
+        texto: editComentario,
         createdAt: new Date().toISOString()
       });
     }
-
     const updateData = {
-      descricaoProblema: editDescricaoHTML, // HTML
+      descricaoProblema: editDescricao,
+      prioridade: editPrioridade,
       status: editStatus,
       responsavel: editResponsavel,
-      prioridad: editPrioridade, 
       attachments: newAttachments,
       comentarios: newComentarios
     };
-
     if (editStatus === "Concluído") {
       const now = new Date();
       updateData.dataResolucaoISO = now.toISOString();
@@ -167,7 +153,6 @@ const TicketListAdmin = ({
       updateData.dataResolucao = "";
       updateData.sla = "";
     }
-
     try {
       await updateDoc(doc(db, 'tickets', ticket.id), updateData);
       if (onSendEmail) {
@@ -190,18 +175,16 @@ const TicketListAdmin = ({
         const isConcluido = (ticket.status === "Concluído");
         const isEditMode = (editTicketId === ticket.id);
 
-        // EDIÇÃO
         if (isEditMode) {
           return (
             <div key={ticket.id} className="border rounded p-2 mb-2 bg-white">
-              {/* Admin Edit Form */}
-              {/* 1) Descrição (Rich Text) */}
-              <label className="block font-semibold mt-2">Descrição (Rich Text):</label>
-              <ReactQuill
-                value={editDescricaoHTML}
-                onChange={setEditDescricaoHTML}
-                theme="snow"
-                style={{ minHeight: "100px", backgroundColor: "#fff" }}
+              {/* ID não é exibido para o Admin */}
+              <label className="block mt-2 font-semibold">Descrição:</label>
+              <textarea
+                className="border rounded px-2 py-1 w-full"
+                rows={3}
+                value={editDescricao}
+                onChange={(e) => setEditDescricao(e.target.value)}
               />
 
               <label className="block mt-2 font-semibold">Prioridade:</label>
@@ -238,13 +221,12 @@ const TicketListAdmin = ({
                 <option value="Nayla Martins">Nayla Martins</option>
               </select>
 
-              {/* Comentário (Rich Text) */}
-              <label className="block mt-2 font-semibold">Adicionar Comentário (Rich Text):</label>
-              <ReactQuill
-                value={editComentarioHTML}
-                onChange={setEditComentarioHTML}
-                theme="snow"
-                style={{ minHeight: "80px", backgroundColor: "#fff" }}
+              <label className="block mt-2 font-semibold">Adicionar Comentário:</label>
+              <textarea
+                className="border rounded px-2 py-1 w-full"
+                rows={2}
+                value={editComentario}
+                onChange={(e) => setEditComentario(e.target.value)}
               />
 
               <label className="block mt-2 font-semibold">Anexar novos arquivos:</label>
@@ -270,120 +252,95 @@ const TicketListAdmin = ({
               </div>
             </div>
           );
-        }
+        } else {
+          return (
+            <div key={ticket.id} className="border rounded p-2 mb-2 bg-white">
+              {/* Ordem de exibição para Admin */}
+              <p><strong>Solicitante:</strong> {ticket.nomeSolicitante}</p>
+              <p><strong>Cargo/Departamento:</strong> {ticket.cargoDepartamento}</p>
+              <p><strong>Categoria:</strong> {ticket.categoria}</p>
 
-        // VISUALIZAÇÃO
-        return (
-          <div key={ticket.id} className="border rounded p-2 mb-2 bg-white">
-            {/* 1) Solicitante */}
-            <p><strong>Solicitante:</strong> {ticket.nomeSolicitante}</p>
-
-            {/* 2) Cargo/Departamento */}
-            <p><strong>Cargo/Departamento:</strong> {ticket.cargoDepartamento}</p>
-
-            {/* 3) Categoria */}
-            <p><strong>Categoria:</strong> {ticket.categoria}</p>
-
-            {/* 4) Descrição (HTML) */}
-            <div>
-              <strong>Descrição:</strong>
-              <div
-                style={{ fontSize: "0.95rem" }}
-                dangerouslySetInnerHTML={{ __html: ticket.descricaoProblema }}
-              />
-            </div>
-
-            {/* 5) Data de Abertura */}
-            <p><strong>Data de Abertura:</strong> {ticket.dataDeAbertura}</p>
-
-            {/* 6) Prioridade */}
-            <p><strong>Prioridade:</strong> {ticket.prioridade}</p>
-
-            {/* 7) Responsável */}
-            <p><strong>Responsável (Atendente):</strong> {ticket.responsavel || "Não definido"}</p>
-
-            {/* 8) Status */}
-            <p><strong>Status:</strong> {ticket.status}</p>
-
-            {/* 9) Comentários (HTML) */}
-            {ticket.comentarios && ticket.comentarios.length > 0 && (
               <div>
-                <strong>Comentários:</strong>
-                <ul style={{ fontSize: '0.9rem' }}>
-                  {ticket.comentarios.map((com, idx) => (
-                    <li key={idx} className="ml-4 list-disc">
-                      <strong>{com.autor}:</strong>{" "}
-                      <div
-                        style={{ display: 'inline-block' }}
-                        dangerouslySetInnerHTML={{ __html: com.texto }}
-                      />
-                    </li>
-                  ))}
-                </ul>
+                <strong>Descrição:</strong>
+                <div style={{ fontSize: '0.95rem' }}>
+                  {ticket.descricaoProblema}
+                </div>
               </div>
-            )}
 
-            {/* 10) Anexos */}
-            {ticket.attachments && ticket.attachments.length > 0 && (
-              <div>
-                <strong>Anexos:</strong>
-                <ul>
-                  {ticket.attachments.map((att, i) => (
-                    <li key={i}>
-                      <a
-                        href={att.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        style={{
-                          color: 'blue',
-                          textDecoration: 'underline',
-                          fontSize: '0.85rem'
-                        }}
-                      >
-                        {att.name}
-                      </a>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
+              <p><strong>Data de Abertura:</strong> {ticket.dataDeAbertura}</p>
+              <p><strong>Prioridade:</strong> {ticket.prioridade}</p>
+              <p><strong>Responsável (Atendente):</strong> {ticket.responsavel || "Não definido"}</p>
+              <p><strong>Status:</strong> {ticket.status}</p>
 
-            {/* 11) Data de Encerramento (se concluído) */}
-            {ticket.dataResolucao && (
-              <p><strong>Data de Encerramento:</strong> {ticket.dataResolucao}</p>
-            )}
-
-            {/* 12) SLA */}
-            {ticket.sla && (
-              <p><strong>SLA:</strong> {ticket.sla}</p>
-            )}
-
-            {/* 13) Avaliação do usuário */}
-            {ticket.avaliacao && (
-              <div>
-                <strong>Avaliação do Usuário:</strong>
-                <StarRating rating={ticket.avaliacao} setRating={()=>{}} readOnly={true} />
-              </div>
-            )}
-
-            <div className="flex gap-2 mt-2">
-              {!isConcluido && (
-                <button
-                  onClick={() => startEditTicket(ticket)}
-                  className="px-2 py-1 bg-green-500 text-white rounded"
-                >
-                  Editar
-                </button>
+              {ticket.comentarios && ticket.comentarios.length > 0 && (
+                <div>
+                  <strong>Comentários:</strong>
+                  <ul style={{ fontSize: '0.9rem' }}>
+                    {ticket.comentarios.map((com, idx) => (
+                      <li key={idx} className="ml-4 list-disc">
+                        <strong>{com.autor}:</strong> {com.texto}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
               )}
-              <button
-                onClick={() => handleDeleteTicket(ticket.id)}
-                className="px-2 py-1 bg-red-500 text-white rounded"
-              >
-                Excluir
-              </button>
+
+              {ticket.attachments && ticket.attachments.length > 0 && (
+                <div>
+                  <strong>Anexos:</strong>
+                  <ul>
+                    {ticket.attachments.map((att, i) => (
+                      <li key={i}>
+                        <a
+                          href={att.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          style={{
+                            color: 'blue',
+                            textDecoration: 'underline',
+                            fontSize: '0.85rem'
+                          }}
+                        >
+                          {att.name}
+                        </a>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {ticket.dataResolucao && (
+                <p><strong>Data de Encerramento:</strong> {ticket.dataResolucao}</p>
+              )}
+              {ticket.sla && (
+                <p><strong>SLA:</strong> {ticket.sla}</p>
+              )}
+              {ticket.avaliacao && (
+                <div>
+                  <strong>Avaliação do Usuário:</strong>
+                  <StarRating rating={ticket.avaliacao} setRating={() => {}} readOnly={true} />
+                </div>
+              )}
+
+              <div className="flex gap-2 mt-2">
+                {!ticket.status.includes("Concluído") ? (
+                  <button
+                    onClick={() => startEditTicket(ticket)}
+                    className="px-2 py-1 bg-green-500 text-white rounded"
+                  >
+                    Editar
+                  </button>
+                ) : null}
+                <button
+                  onClick={() => handleDeleteTicket(ticket.id)}
+                  className="px-2 py-1 bg-red-500 text-white rounded"
+                >
+                  Excluir
+                </button>
+              </div>
             </div>
-          </div>
-        );
+          );
+        }
       })}
     </div>
   );
