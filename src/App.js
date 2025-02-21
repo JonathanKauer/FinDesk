@@ -1,4 +1,3 @@
-// src/App.js
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Helmet } from 'react-helmet';
@@ -311,9 +310,14 @@ function App() {
     setNewTicketFiles(Array.from(e.target.files));
   };
 
+  // Se o usuário não estiver logado, exibimos o cabeçalho acima do formulário de login/cadastro
   if (!currentUser) {
     return (
-      <div className="flex items-center justify-center">
+      <div className="flex flex-col items-center justify-center min-h-screen">
+        <div className="flex flex-col items-center mb-8">
+          <img src="/logo.png" alt="FinDesk Logo" className="h-12 mb-2" />
+          <h1 className="text-3xl font-bold" style={{ color: "#0E1428" }}>FinDesk</h1>
+        </div>
         {isLoginScreen ? (
           <form onSubmit={handleLoginSubmit} className="bg-white shadow p-4 rounded-2xl w-full max-w-md">
             <h2 className="text-xl font-bold mb-4 text-center">Faça seu login</h2>
@@ -397,6 +401,7 @@ function App() {
     );
   }
 
+  // Tela principal quando o usuário está logado, com cabeçalho e botão "Sair"
   return (
     <div className="min-h-screen bg-gray-100 relative p-4" style={{ color: "#0E1428" }}>
       <Helmet>
@@ -404,15 +409,25 @@ function App() {
         <link rel="icon" href="/guiainvest-logo.png" />
       </Helmet>
 
-      <div className="flex flex-col items-center mb-4">
-        <img src="/logo.png" alt="FinDesk Logo" className="h-12 mb-2" />
-        <motion.h1
-          className="text-3xl font-bold"
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-        >
-          FinDesk
-        </motion.h1>
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex flex-col items-center">
+          <img src="/logo.png" alt="FinDesk Logo" className="h-12 mb-2" />
+          <motion.h1
+            className="text-3xl font-bold"
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+          >
+            FinDesk
+          </motion.h1>
+        </div>
+        <div>
+          <button
+            onClick={handleLogout}
+            className="px-3 py-1 bg-red-500 text-white rounded"
+          >
+            Sair
+          </button>
+        </div>
       </div>
 
       {currentUser.isAdmin && (
