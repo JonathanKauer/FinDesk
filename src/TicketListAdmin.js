@@ -122,12 +122,17 @@ const TicketListAdmin = ({
     if (editComentario.trim()) {
       // Mapeia o e-mail do admin para o nome desejado
       let autor = "Admin";
+      console.log("Autor: ", autor);
+      console.log("Current User: ", currentUser);
+      
       if (currentUser && currentUser.email) {
+        console.log("Entrei no if");
         if (currentUser.email === "jonathan.kauer@guiainvest.com.br") {
           autor = "Jonathan Kauer";
         } else if (currentUser.email === "nayla.martins@guiainvest.com.br") {
           autor = "Nayla Martins";
         } else {
+          console.log("Cheguei no else.");
           // Caso o displayName esteja disponível, usa-o
           autor = currentUser.displayName || currentUser.email.split('@')[0];
         }
