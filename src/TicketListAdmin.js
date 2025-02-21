@@ -11,8 +11,7 @@ import {
 } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { db, storage } from './firebase-config.js';
-import { getDisplayNameForComment } from './utils.js'; // ou importe de onde você declarou
-// calculateSLA vem como prop, pra calcular SLA
+import { StarRating, getDisplayName } from './utils.js';
 
 const TicketListAdmin = ({
   activeTab,
@@ -21,10 +20,12 @@ const TicketListAdmin = ({
   filterAtendente,
   onSendEmail,
   calculateSLA,
+  currentUser // Recebido do App.js
 }) => {
   const [tickets, setTickets] = useState([]);
   const [loading, setLoading] = useState(true);
 
+  // Edição do admin
   const [editTicketId, setEditTicketId] = useState(null);
   const [editStatus, setEditStatus] = useState("");
   const [editResponsavel, setEditResponsavel] = useState("");
@@ -44,21 +45,22 @@ const TicketListAdmin = ({
           ...docSnap.data()
         }));
 
+        // Filtros
         if (filterPriority) {
-          list = list.filter((tk) => tk.prioridade === filterPriority);
+          list = list.filter(tk => tk.prioridade === filterPriority);
         }
         if (filterCategory) {
-          list = list.filter((tk) => tk.categoria === filterCategory);
+          list = list.filter(tk => tk.categoria === filterCategory);
         }
         if (filterAtendente) {
-          list = list.filter((tk) => tk.responsavel === filterAtendente);
+          list = list.filter(tk => tk.responsavel === filterAtendente);
         }
 
-        // Filtro da aba
-        if (activeTab === 'open') {
-          list = list.filter((tk) => tk.status !== 'Concluído');
+        // Aba "open" vs "closed"
+        if (activeTab === "open") {
+          list = list.filter(tk => tk.status !== "Concluído");
         } else {
-          list = list.filter((tk) => tk.status === 'Concluído');
+          list = list.filter(tk => tk.status === "Concluído");
         }
 
         setTickets(list);
@@ -72,6 +74,25 @@ const TicketListAdmin = ({
     return () => unsubscribe();
   }, [activeTab, filterPriority, filterCategory, filterAtendente]);
 
+  // Iniciar edição
+  const startEditTicket = (ticket) => {
+    setEditTicketId(ticket.id);
+    setEditStatus(ticket.status || "");
+    setEditResponsavel(ticket.responsavel || "");
+    setEditComentario("");
+    setEditFiles([]);
+  };
+
+  // Cancelar edição
+  const cancelEditTicket = () => {
+    setEditTicketId(null);
+    setEditStatus("");
+    setEditResponsavel("");
+    setEditComentario("");
+    setEditFiles([]);
+  };
+
+  // Excluir chamado (sempre liberado, mesmo que concluído)
   const handleDeleteTicket = async (ticketId) => {
     try {
       await deleteDoc(doc(db, 'tickets', ticketId));
@@ -82,23 +103,7 @@ const TicketListAdmin = ({
     }
   };
 
-  // Iniciar edição
-  const startEditTicket = (ticket) => {
-    setEditTicketId(ticket.id);
-    setEditStatus(ticket.status || "");
-    setEditResponsavel(ticket.responsavel || "");
-    setEditComentario("");
-    setEditFiles([]);
-  };
-
-  const cancelEditTicket = () => {
-    setEditTicketId(null);
-    setEditStatus("");
-    setEditResponsavel("");
-    setEditComentario("");
-    setEditFiles([]);
-  };
-
+  // Salvar edição
   const saveEditTicket = async (ticket) => {
     let newAttachments = ticket.attachments || [];
     if (editFiles.length > 0) {
@@ -116,19 +121,16 @@ const TicketListAdmin = ({
 
     let newComentarios = ticket.comentarios || [];
     if (editComentario.trim()) {
-      const autor = getDisplayNameForComment(ticket, { ...ticket, isAdmin: true, email: '' });
-      // *Mas aqui idealmente usamos o "currentUser" real.
-      // Se vc tiver o currentUser no app, passe como prop. Exemplo:
-      // getDisplayNameForComment(ticket, currentUser)
-      // Para simplificar, simulamos "Admin" abaixo:
+      // Usa a função getDisplayName para pegar o nome do admin logado
+      const autor = getDisplayName(ticket, currentUser);
       newComentarios.push({
-        autor: "Admin", // ou "Jonathan Kauer"
+        autor,
         texto: editComentario,
         createdAt: new Date().toISOString()
       });
     }
 
-    // Montar update
+    // Monta update
     const updateData = {
       attachments: newAttachments,
       comentarios: newComentarios,
@@ -136,7 +138,7 @@ const TicketListAdmin = ({
       responsavel: editResponsavel
     };
 
-    // Se marcar como concluído, define dataResolucao e sla
+    // Se marcar concluído, define dataResolucao e SLA
     if (editStatus === "Concluído") {
       const now = new Date();
       updateData.dataResolucaoISO = now.toISOString();
@@ -145,7 +147,7 @@ const TicketListAdmin = ({
         updateData.sla = calculateSLA(ticket.dataDeAberturaISO, updateData.dataResolucaoISO);
       }
     } else {
-      // Caso admin volte para "Aberto" ou "Em Andamento"
+      // Se voltar pra "Aberto" ou "Em Andamento"
       updateData.dataResolucaoISO = "";
       updateData.dataResolucao = "";
       updateData.sla = "";
@@ -153,7 +155,9 @@ const TicketListAdmin = ({
 
     try {
       await updateDoc(doc(db, 'tickets', ticket.id), updateData);
-      if (onSendEmail) onSendEmail({ ...ticket, ...updateData }, "Ticket atualizado pelo admin");
+      if (onSendEmail) {
+        onSendEmail({ ...ticket, ...updateData }, "Ticket atualizado pelo admin");
+      }
       cancelEditTicket();
     } catch (error) {
       console.error("Erro ao atualizar ticket:", error);
@@ -167,16 +171,17 @@ const TicketListAdmin = ({
   return (
     <div>
       <h2 className="text-xl font-bold mb-4">Tickets Administrativos</h2>
-      {tickets.map((ticket) => {
-        const isConcluido = ticket.status === "Concluído";
+      {tickets.map(ticket => {
+        const isConcluido = (ticket.status === "Concluído");
 
         return (
           <div key={ticket.id} className="border rounded p-2 mb-2 bg-white">
             {editTicketId === ticket.id ? (
-              /* -------------- FORM DE EDIÇÃO -------------- */
+              // ---------- FORM DE EDIÇÃO ----------
               <div>
                 <p><strong>ID:</strong> {ticket.id}</p>
-                <label>Status:</label>
+
+                <label className="block mt-2">Status:</label>
                 <select
                   value={editStatus}
                   onChange={(e) => setEditStatus(e.target.value)}
@@ -187,7 +192,7 @@ const TicketListAdmin = ({
                   <option value="Concluído">Concluído</option>
                 </select>
 
-                <label>Responsável (Atendente):</label>
+                <label className="block mt-2">Responsável:</label>
                 <select
                   value={editResponsavel}
                   onChange={(e) => setEditResponsavel(e.target.value)}
@@ -198,7 +203,7 @@ const TicketListAdmin = ({
                   <option value="Nayla Martins">Nayla Martins</option>
                 </select>
 
-                <label>Adicionar Comentário (Admin):</label>
+                <label className="block mt-2">Adicionar Comentário (Admin):</label>
                 <textarea
                   className="border px-2 py-1 rounded w-full"
                   rows={2}
@@ -206,12 +211,11 @@ const TicketListAdmin = ({
                   onChange={(e) => setEditComentario(e.target.value)}
                 />
 
-                <label>Anexar novos arquivos:</label>
+                <label className="block mt-2">Anexar novos arquivos:</label>
                 <input
                   type="file"
                   multiple
                   onChange={(e) => setEditFiles(Array.from(e.target.files))}
-                  className="mt-1"
                 />
 
                 <div className="flex gap-2 mt-4">
@@ -230,19 +234,19 @@ const TicketListAdmin = ({
                 </div>
               </div>
             ) : (
-              /* -------------- VISUALIZAÇÃO -------------- */
+              // ---------- VISUALIZAÇÃO ----------
               <div>
                 <p><strong>ID:</strong> {ticket.id}</p>
                 <p><strong>Solicitante:</strong> {ticket.nomeSolicitante}</p>
                 <p><strong>Status:</strong> {ticket.status}</p>
-                <p><strong>Responsável (Atendente):</strong> {ticket.responsavel || "Não definido"}</p>
+                <p><strong>Responsável:</strong> {ticket.responsavel || "Não definido"}</p>
                 <p><strong>Prioridade:</strong> {ticket.prioridade}</p>
                 <p><strong>Data de Abertura:</strong> {ticket.dataDeAbertura}</p>
 
-                {isConcluido && ticket.dataResolucao && (
+                {ticket.dataResolucao && (
                   <p><strong>Data de Encerramento:</strong> {ticket.dataResolucao}</p>
                 )}
-                {isConcluido && ticket.sla && (
+                {ticket.sla && (
                   <p><strong>SLA:</strong> {ticket.sla}</p>
                 )}
 
@@ -250,13 +254,21 @@ const TicketListAdmin = ({
                 <p><strong>Categoria:</strong> {ticket.categoria}</p>
                 <p><strong>Cargo/Departamento:</strong> {ticket.cargoDepartamento}</p>
 
+                {/* Avaliação do usuário (caso exista) */}
+                {ticket.avaliacao && (
+                  <div>
+                    <strong>Avaliação do Usuário:</strong>
+                    <StarRating rating={ticket.avaliacao} setRating={()=>{}} readOnly={true} />
+                  </div>
+                )}
+
                 {/* Anexos */}
                 {ticket.attachments && ticket.attachments.length > 0 && (
                   <div>
                     <strong>Anexos:</strong>
                     <ul>
-                      {ticket.attachments.map((att, i) => (
-                        <li key={i}>
+                      {ticket.attachments.map((att, idx) => (
+                        <li key={idx}>
                           <a href={att.url} target="_blank" rel="noopener noreferrer">
                             {att.name}
                           </a>
@@ -270,7 +282,7 @@ const TicketListAdmin = ({
                 {ticket.comentarios && ticket.comentarios.length > 0 && (
                   <div>
                     <strong>Comentários:</strong>
-                    <ul style={{ fontSize: "0.9rem" }}>
+                    <ul style={{ fontSize: '0.9rem' }}>
                       {ticket.comentarios.map((com, idx) => (
                         <li key={idx} className="ml-4 list-disc">
                           <strong>{com.autor}:</strong> {com.texto}
@@ -280,23 +292,25 @@ const TicketListAdmin = ({
                   </div>
                 )}
 
-                {/* Se concluído, não mostra botão de Editar */}
-                {!isConcluido && (
-                  <div className="flex gap-2 mt-2">
+                {/* Botoes de ação */}
+                <div className="flex gap-2 mt-2">
+                  {/* Se não está concluído, exibe "Editar" */}
+                  {(!isConcluido) && (
                     <button
                       onClick={() => startEditTicket(ticket)}
                       className="px-2 py-1 bg-green-500 text-white rounded"
                     >
                       Editar
                     </button>
-                    <button
-                      onClick={() => handleDeleteTicket(ticket.id)}
-                      className="px-2 py-1 bg-red-500 text-white rounded"
-                    >
-                      Excluir
-                    </button>
-                  </div>
-                )}
+                  )}
+                  {/* Excluir sempre aparece */}
+                  <button
+                    onClick={() => handleDeleteTicket(ticket.id)}
+                    className="px-2 py-1 bg-red-500 text-white rounded"
+                  >
+                    Excluir
+                  </button>
+                </div>
               </div>
             )}
           </div>
