@@ -14,7 +14,7 @@ import { db, auth, storage } from './firebase-config.js';
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 
 // Componentes de listagem
-import TicketList from './TicketList.js';         // Visualização resumida para usuários comuns
+import TicketList from './TicketList.js';         // Visualização resumida para usuários comuns (inclui botões de reabertura e avaliação)
 import TicketListAdmin from './TicketListAdmin.js'; // Visualização completa para admin
 
 // Constantes e configurações
@@ -71,6 +71,23 @@ function generateTicketId() {
   return id;
 }
 
+// Função para calcular SLA automaticamente (em minutos, horas ou dias)
+function calculateSLA(dataDeAberturaISO, dataResolucaoISO) {
+  const start = new Date(dataDeAberturaISO);
+  const end = new Date(dataResolucaoISO);
+  const diffMs = end - start;
+  const diffMinutes = Math.floor(diffMs / 60000);
+  if (diffMinutes < 60) {
+    return diffMinutes + " minuto(s)";
+  }
+  const diffHours = Math.floor(diffMinutes / 60);
+  if (diffHours < 24) {
+    return diffHours + " hora(s)";
+  }
+  const diffDays = Math.floor(diffHours / 24);
+  return diffDays + " dia(s)";
+}
+
 async function sendTicketUpdateEmail(ticket, updateDescription) {
   const subject = "Findesk: Atualização em chamado";
   const body =
@@ -104,7 +121,7 @@ async function sendTicketUpdateEmail(ticket, updateDescription) {
   }
 }
 
-// Valida se o nome é composto e se as iniciais de cada palavra estão em maiúsculas
+// Função para validar se o nome do solicitante é composto com iniciais em maiúsculas
 function isValidSolicitanteName(name) {
   const parts = name.trim().split(/\s+/);
   if (parts.length < 2) return false;
@@ -123,7 +140,7 @@ function App() {
   const [isLoginScreen, setIsLoginScreen] = useState(true);
   const [activeTab, setActiveTab] = useState("open");
 
-  // Estado para o toggle de modo (para admins que podem atuar como usuários comuns)
+  // Estado para o toggle de modo admin (apenas para usuários com a claim admin)
   const [modoAdmin, setModoAdmin] = useState(true);
 
   // Filtros de admin
@@ -296,7 +313,7 @@ function App() {
       prazoFinalizacao,
       status: "Aberto",
       dataResolucao: "",
-      sla: "",
+      sla: "", // Será calculada automaticamente quando o ticket for concluído
       responsavel: "",
       comentarios: [],
       attachments: attachmentURLs,
@@ -436,13 +453,13 @@ function App() {
           </div>
 
           {currentUser.isAdmin && (
-            <div className="flex justify-center mb-4">
+            <div className="flex justify-end mb-4">
               <button
                 onClick={() => setModoAdmin(!modoAdmin)}
                 className="px-3 py-1 rounded shadow"
                 style={{ backgroundColor: modoAdmin ? "#0E1428" : "#FF5E00", color: "white" }}
               >
-                {modoAdmin ? "Modo Admin" : "Modo Usuário Comum"}
+                {modoAdmin ? "Atuando como Admin" : "Atuando como Usuário Comum"}
               </button>
             </div>
           )}
@@ -638,12 +655,14 @@ function App() {
                 filterCategory={adminFilterCategory}
                 filterAtendente={adminFilterAtendente}
                 onSendEmail={sendTicketUpdateEmail}
+                calculateSLA={calculateSLA} // Passa a função para calcular SLA
               />
             ) : (
               <TicketList
                 activeTab={activeTab}
                 currentUser={currentUser}
                 onSendEmail={sendTicketUpdateEmail}
+                calculateSLA={calculateSLA} // Para que o TicketList possa exibir SLA, reabertura e avaliação se implementados
               />
             )}
           </div>
