@@ -18,7 +18,7 @@ import TicketList from './TicketList.js';         // Visualização resumida par
 import TicketListAdmin from './TicketListAdmin.js'; // Visualização completa para admin
 
 // Constantes e configurações
-const ADMIN_DEFAULT_PASSWORD = "admin123@guiainvestgpt";
+const ADMIN_DEFAULT_PASSWORD = "admin123@guiainvestgpt"; // Apenas ilustrativo
 const adminEmails = ["jonathan.kauer@guiainvest.com.br", "nayla.martins@guiainvest.com.br"];
 
 const initialCargoOptions = [
@@ -41,7 +41,7 @@ const priorityOptions = [
   "Urgente (1 dia útil)"
 ];
 
-const atendenteOptions = ["jonathan.kauer@guiainvest.com.br", "nayla.martins@guiainvest.com.br"];
+const atendenteOptions = ["Jonathan Kauer", "Nayla Martins"];
 
 const priorityDaysMapping = {
   "Baixa (7 dias úteis)": 7,
@@ -84,6 +84,7 @@ function calculateSLA(dataDeAberturaISO, dataResolucaoISO) {
   return diffDays + " dia(s)";
 }
 
+// Envio de email via Google Apps Script (exemplo)
 async function sendTicketUpdateEmail(ticket, updateDescription) {
   const subject = "Findesk: Atualização em chamado";
   const body =
@@ -160,6 +161,7 @@ function App() {
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       if (user) {
+        // Exemplo de verificação de admin no token
         user.getIdTokenResult().then(idTokenResult => {
           const isAdminClaim = !!idTokenResult.claims.admin;
           setCurrentUser({ ...user, isAdmin: isAdminClaim });
@@ -182,7 +184,7 @@ function App() {
         const user = userCredential.user;
         user.getIdTokenResult().then(idTokenResult => {
           const isAdminClaim = !!idTokenResult.claims.admin;
-          console.log("Usuário logado com sucesso:", user.uid, "isAdmin:", isAdminClaim);
+          console.log("Usuário logado:", user.uid, "isAdmin:", isAdminClaim);
           setCurrentUser({ ...user, isAdmin: isAdminClaim });
         });
         setLoginEmail("");
@@ -206,7 +208,7 @@ function App() {
     }
     createUserWithEmailAndPassword(auth, signupEmail, signupPassword)
       .then((userCredential) => {
-        console.log("Usuário criado com sucesso:", userCredential.user.uid);
+        console.log("Usuário criado:", userCredential.user.uid);
         alert("Conta criada com sucesso! Faça login para continuar.");
         setIsLoginScreen(true);
         setSignupEmail("");
@@ -318,6 +320,7 @@ function App() {
       alert("Falha ao criar o ticket. Verifique o console para detalhes.");
     }
 
+    // Resetar campos do form
     setNewTicketNome("");
     setCargoDepartamento("");
     setDescricaoProblema("");
@@ -352,7 +355,10 @@ function App() {
       {!currentUser && (
         <div className="flex items-center justify-center">
           {isLoginScreen ? (
-            <form onSubmit={handleLoginSubmit} className="bg-white shadow p-4 rounded-2xl w-full max-w-md">
+            <form
+              onSubmit={handleLoginSubmit}
+              className="bg-white shadow p-4 rounded-2xl w-full max-w-md"
+            >
               <h2 className="text-xl font-bold mb-4 text-center">Faça seu login</h2>
               <div className="mb-2">
                 <label className="block font-semibold">E-mail:</label>
@@ -376,7 +382,11 @@ function App() {
                 />
               </div>
               <div className="flex justify-between mt-4">
-                <button type="submit" className="px-3 py-1 rounded shadow" style={{ backgroundColor: "#0E1428", color: "white" }}>
+                <button
+                  type="submit"
+                  className="px-3 py-1 rounded shadow"
+                  style={{ backgroundColor: "#0E1428", color: "white" }}
+                >
                   Entrar
                 </button>
                 <button
@@ -390,13 +400,20 @@ function App() {
               </div>
               <p className="mt-4 text-center">
                 Não tem conta?{" "}
-                <button type="button" onClick={() => setIsLoginScreen(false)} className="text-blue-500">
+                <button
+                  type="button"
+                  onClick={() => setIsLoginScreen(false)}
+                  className="text-blue-500"
+                >
                   Cadastre-se
                 </button>
               </p>
             </form>
           ) : (
-            <form onSubmit={handleSignUp} className="bg-white shadow p-4 rounded-2xl w-full max-w-md">
+            <form
+              onSubmit={handleSignUp}
+              className="bg-white shadow p-4 rounded-2xl w-full max-w-md"
+            >
               <h2 className="text-xl font-bold mb-4 text-center">Crie sua conta</h2>
               <div className="mb-2">
                 <label className="block font-semibold">E-mail:</label>
@@ -419,12 +436,20 @@ function App() {
                   className="border rounded px-2 py-1 w-full"
                 />
               </div>
-              <button type="submit" className="w-full px-3 py-1 rounded shadow" style={{ backgroundColor: "#0E1428", color: "white" }}>
+              <button
+                type="submit"
+                className="w-full px-3 py-1 rounded shadow"
+                style={{ backgroundColor: "#0E1428", color: "white" }}
+              >
                 Criar Conta
               </button>
               <p className="mt-4 text-center">
                 Já tem conta?{" "}
-                <button type="button" onClick={() => setIsLoginScreen(true)} className="text-blue-500">
+                <button
+                  type="button"
+                  onClick={() => setIsLoginScreen(true)}
+                  className="text-blue-500"
+                >
                   Faça login
                 </button>
               </p>
@@ -436,7 +461,11 @@ function App() {
       {currentUser && (
         <>
           <div className="absolute top-4 right-4">
-            <button onClick={handleLogout} className="px-3 py-1 rounded shadow" style={{ backgroundColor: "#FF5E00", color: "white" }}>
+            <button
+              onClick={handleLogout}
+              className="px-3 py-1 rounded shadow"
+              style={{ backgroundColor: "#FF5E00", color: "white" }}
+            >
               Sair
             </button>
           </div>
@@ -625,10 +654,18 @@ function App() {
                 <input type="file" multiple onChange={handleTicketFileChange} className="w-full" />
               </div>
               <div className="flex justify-end gap-2 mt-4">
-                <button type="button" onClick={() => setShowNewTicketForm(false)} className="px-3 py-1 bg-gray-300 rounded">
+                <button
+                  type="button"
+                  onClick={() => setShowNewTicketForm(false)}
+                  className="px-3 py-1 bg-gray-300 rounded"
+                >
                   Cancelar
                 </button>
-                <button type="submit" className="px-3 py-1 rounded" style={{ backgroundColor: "#0E1428", color: "white" }}>
+                <button
+                  type="submit"
+                  className="px-3 py-1 rounded"
+                  style={{ backgroundColor: "#0E1428", color: "white" }}
+                >
                   Criar Chamado
                 </button>
               </div>
