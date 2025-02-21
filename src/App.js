@@ -18,7 +18,7 @@ import TicketListAdmin from './TicketListAdmin.js';
 
 // (1) Import do ReactQuill
 import ReactQuill from 'react-quill';
-import 'quill/dist/quill.snow.css';  // <-- Importa o tema da lib quill direto
+import 'quill/dist/quill.snow.css';
 
 const initialCargoOptions = [
   "Aquisição",
