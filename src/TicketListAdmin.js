@@ -11,8 +11,7 @@ import {
 } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { db, storage } from './firebase-config.js';
-import { StarRating } from './utils.js'; // se você quiser exibir avaliação em estrelas
-// import { getDisplayName } ... se quiser usar a lógica de "Jonathan Kauer" vs "Nayla Martins"
+import { StarRating } from './utils.js';
 
 const TicketListAdmin = ({
   activeTab,
@@ -26,7 +25,7 @@ const TicketListAdmin = ({
   const [tickets, setTickets] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  // Edição do Admin
+  // Estados para edição do Admin
   const [editTicketId, setEditTicketId] = useState(null);
   const [editStatus, setEditStatus] = useState("");
   const [editResponsavel, setEditResponsavel] = useState("");
@@ -121,8 +120,8 @@ const TicketListAdmin = ({
 
     let newComentarios = ticket.comentarios || [];
     if (editComentario.trim()) {
-      // Se quiser mapear o e-mail do currentUser pra "Jonathan Kauer" etc., faça aqui
-      const autor = (currentUser && currentUser.email) || "Admin";
+      // Usa o displayName do admin ou "Admin" caso não exista
+      const autor = (currentUser && currentUser.displayName) || "Admin";
       newComentarios.push({
         autor,
         texto: editComentario,
@@ -177,8 +176,7 @@ const TicketListAdmin = ({
         if (editTicketId === ticket.id) {
           return (
             <div key={ticket.id} className="border rounded p-2 mb-2 bg-white">
-              <p><strong>ID:</strong> {ticket.id}</p>
-
+              {/* Formulário de edição sem exibir o ID */}
               <label className="block mt-2 font-semibold">Status:</label>
               <select
                 value={editStatus}
@@ -237,34 +235,15 @@ const TicketListAdmin = ({
         // ---------- VISUALIZAÇÃO (ADMIN) ----------
         return (
           <div key={ticket.id} className="border rounded p-2 mb-2 bg-white">
-            <p><strong>ID:</strong> {ticket.id}</p>
-
-            {/* Vamos reorganizar para a mesma ordem principal: Descrição, DataAbertura, Prioridade, Status, Comentários, Anexos. 
-                MAS, como admin vê mais info, adicionamos Responsável, etc. conforme necessidade.
-            */}
-            
-            {/* Descrição */}
+            {/* Ordem de exibição para Admin */}
+            <p><strong>Solicitante:</strong> {ticket.nomeSolicitante}</p>
+            <p><strong>Cargo/Departamento:</strong> {ticket.cargoDepartamento}</p>
+            <p><strong>Categoria:</strong> {ticket.categoria}</p>
             <p><strong>Descrição:</strong> {ticket.descricaoProblema}</p>
-
-            {/* Data de Abertura */}
             <p><strong>Data de Abertura:</strong> {ticket.dataDeAbertura}</p>
-
-            {/* Prioridade */}
             <p><strong>Prioridade:</strong> {ticket.prioridade}</p>
-
-            {/* Status */}
-            <p><strong>Status:</strong> {ticket.status}</p>
-
-            {/* Responsável (Atendente) */}
             <p><strong>Responsável:</strong> {ticket.responsavel || "Não definido"}</p>
-
-            {/* Se já estiver concluído, exibir data de encerramento e SLA */}
-            {ticket.dataResolucao && (
-              <p><strong>Data de Encerramento:</strong> {ticket.dataResolucao}</p>
-            )}
-            {ticket.sla && (
-              <p><strong>SLA:</strong> {ticket.sla}</p>
-            )}
+            <p><strong>Status:</strong> {ticket.status}</p>
 
             {/* Comentários */}
             {ticket.comentarios && ticket.comentarios.length > 0 && (
@@ -280,7 +259,7 @@ const TicketListAdmin = ({
               </div>
             )}
 
-            {/* Anexos (link azul, sublinhado, fonte menor) */}
+            {/* Anexos */}
             {ticket.attachments && ticket.attachments.length > 0 && (
               <div>
                 <strong>Anexos:</strong>
@@ -305,7 +284,15 @@ const TicketListAdmin = ({
               </div>
             )}
 
-            {/* Avaliação do Usuário, se houver */}
+            {/* Data de Encerramento e SLA */}
+            {ticket.dataResolucao && (
+              <p><strong>Data de Encerramento:</strong> {ticket.dataResolucao}</p>
+            )}
+            {ticket.sla && (
+              <p><strong>SLA:</strong> {ticket.sla}</p>
+            )}
+
+            {/* Avaliação do Usuário */}
             {ticket.avaliacao && (
               <div>
                 <strong>Avaliação do Usuário: </strong>
