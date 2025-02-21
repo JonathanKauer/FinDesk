@@ -11,10 +11,7 @@ import {
 } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { db, storage } from './firebase-config.js';
-
 import { StarRating } from './utils.js'; 
-// Se você estiver usando o componente de estrelas a partir de um utils.js. 
-// Caso não use, remova esse import.
 
 const priorityOptions = [
   "Baixa (7 dias úteis)",
@@ -189,9 +186,7 @@ const TicketList = ({ currentUser, activeTab, onSendEmail, calculateSLA }) => {
     }
   };
 
-  // Se estiver carregando
   if (loading) return <p>Carregando seus chamados...</p>;
-  // Se não houver tickets
   if (tickets.length === 0) return <p>Nenhum chamado encontrado.</p>;
 
   return (
@@ -291,27 +286,13 @@ const TicketList = ({ currentUser, activeTab, onSendEmail, calculateSLA }) => {
           // ---------- MODO VISUALIZAÇÃO (ORDEM SOLICITADA) ----------
           return (
             <div key={ticket.id} className="border rounded p-2 mb-2 bg-white">
-              {/* 1. Descrição */}
+              {/* Ordem para usuário: Descrição, Data de Abertura, Prioridade, Status, Comentários, Anexos */}
               <p><strong>Descrição:</strong> {ticket.descricaoProblema}</p>
-
-              {/* 2. Data de Abertura */}
               <p><strong>Data de Abertura:</strong> {ticket.dataDeAbertura}</p>
-
-              {/* 3. Prioridade */}
               <p><strong>Prioridade:</strong> {ticket.prioridade}</p>
-
-              {/* 4. Status */}
               <p><strong>Status:</strong> {ticket.status}</p>
 
-              {/* Se houver data de encerramento e SLA, podemos exibir também, se quiser (opcional) */}
-              {ticket.dataResolucao && (
-                <p><strong>Data de Encerramento:</strong> {ticket.dataResolucao}</p>
-              )}
-              {ticket.sla && (
-                <p><strong>SLA:</strong> {ticket.sla}</p>
-              )}
-
-              {/* 5. Comentários */}
+              {/* Comentários */}
               {ticket.comentarios && ticket.comentarios.length > 0 && (
                 <div>
                   <strong>Comentários:</strong>
@@ -325,7 +306,7 @@ const TicketList = ({ currentUser, activeTab, onSendEmail, calculateSLA }) => {
                 </div>
               )}
 
-              {/* 6. Anexos (link azul, sublinhado, fonte menor) */}
+              {/* Anexos */}
               {ticket.attachments && ticket.attachments.length > 0 && (
                 <div>
                   <strong>Anexos:</strong>
@@ -350,41 +331,44 @@ const TicketList = ({ currentUser, activeTab, onSendEmail, calculateSLA }) => {
                 </div>
               )}
 
-              {/* Botões de ação (Reabrir, Avaliar, Editar) */}
-              {isConcluido ? (
-                <div className="mt-2 flex gap-2">
-                  <button
-                    onClick={() => handleReopenTicket(ticket)}
-                    className="px-2 py-1 rounded bg-blue-500 text-white"
-                  >
-                    Reabrir Chamado
-                  </button>
-
-                  {/* Avaliação: se ticket.avaliacao existir, mostra estrelas em readOnly */}
-                  {ticket.avaliacao ? (
-                    <div>
-                      <p className="inline-block mr-2">Chamado Avaliado:</p>
-                      <StarRating rating={ticket.avaliacao} setRating={()=>{}} readOnly={true} />
-                    </div>
-                  ) : (
+              {/* Botões de ação */}
+              <div className="mt-2">
+                {isConcluido ? (
+                  <div className="mt-2 flex gap-2">
+                    {/* Só exibe o botão de reabertura se o ticket ainda não foi avaliado */}
+                    {!ticket.avaliacao && (
+                      <button
+                        onClick={() => handleReopenTicket(ticket)}
+                        className="px-2 py-1 rounded bg-blue-500 text-white"
+                      >
+                        Reabrir Chamado
+                      </button>
+                    )}
+                    {ticket.avaliacao ? (
+                      <div>
+                        <p className="inline-block mr-2">Chamado Avaliado:</p>
+                        <StarRating rating={ticket.avaliacao} setRating={()=>{}} readOnly={true} />
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => handleEvaluateTicket(ticket)}
+                        className="px-2 py-1 rounded bg-green-500 text-white"
+                      >
+                        Avaliar Chamado
+                      </button>
+                    )}
+                  </div>
+                ) : (
+                  <div className="mt-2">
                     <button
-                      onClick={() => handleEvaluateTicket(ticket)}
-                      className="px-2 py-1 rounded bg-green-500 text-white"
+                      onClick={() => startEditTicket(ticket)}
+                      className="px-2 py-1 bg-green-500 text-white rounded"
                     >
-                      Avaliar Chamado
+                      Editar Chamado
                     </button>
-                  )}
-                </div>
-              ) : (
-                <div className="mt-2">
-                  <button
-                    onClick={() => startEditTicket(ticket)}
-                    className="px-2 py-1 bg-green-500 text-white rounded"
-                  >
-                    Editar Chamado
-                  </button>
-                </div>
-              )}
+                  </div>
+                )}
+              </div>
             </div>
           );
         }
