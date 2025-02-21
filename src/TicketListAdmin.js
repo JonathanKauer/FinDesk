@@ -126,7 +126,9 @@ const TicketListAdmin = ({
     }
     let newComentarios = ticket.comentarios || [];
     if (editComentario.trim()) {
-      const autor = (currentUser && currentUser.email) || "Admin";
+      const autor = (currentUser && currentUser.displayName) ||
+              (currentUser && currentUser.email && currentUser.email.toLowerCase().includes("jonathan.kauer") ? "Jonathan Kauer" : "Nayla Martins") ||
+              "Admin";
       newComentarios.push({
         autor,
         texto: editComentario,
