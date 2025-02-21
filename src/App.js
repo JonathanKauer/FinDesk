@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Helmet } from "react-helmet";
-import { collection, addDoc } from 'firebase/firestore';
+import { collection, doc, setDoc } from 'firebase/firestore';
 import {
   onAuthStateChanged,
   signInWithEmailAndPassword,
@@ -14,10 +14,10 @@ import { db, auth, storage } from './firebase-config.js';
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 
 // Componentes de listagem
-import TicketList from './TicketList.js';         // Para usuário comum
+import TicketList from './TicketList.js';         // Para usuário comum (visualização resumida)
 import TicketListAdmin from './TicketListAdmin.js'; // Para admin
 
-// Constantes de admin
+// Configurações e constantes
 const ADMIN_DEFAULT_PASSWORD = "admin123@guiainvestgpt";
 const adminEmails = ["jonathan.kauer@guiainvest.com.br", "nayla.martins@guiainvest.com.br"];
 
@@ -104,7 +104,7 @@ async function sendTicketUpdateEmail(ticket, updateDescription) {
   }
 }
 
-// Função para validar que o nome é composto com iniciais maiúsculas
+// Função para validar que o nome do solicitante é composto com iniciais em maiúsculas
 function isValidSolicitanteName(name) {
   const parts = name.trim().split(/\s+/);
   if (parts.length < 2) return false;
@@ -117,6 +117,7 @@ function isValidSolicitanteName(name) {
 function App() {
   const [currentUser, setCurrentUser] = useState(null);
 
+  // Estados para login e cadastro
   const [loginEmail, setLoginEmail] = useState("");
   const [loginPassword, setLoginPassword] = useState("");
   const [signupEmail, setSignupEmail] = useState("");
@@ -125,10 +126,12 @@ function App() {
 
   const [activeTab, setActiveTab] = useState("open");
 
+  // Filtros de admin
   const [adminFilterPriority, setAdminFilterPriority] = useState("");
   const [adminFilterCategory, setAdminFilterCategory] = useState("");
   const [adminFilterAtendente, setAdminFilterAtendente] = useState("");
 
+  // Estados do formulário de criação de ticket
   const [showNewTicketForm, setShowNewTicketForm] = useState(false);
   const [newTicketNome, setNewTicketNome] = useState("");
   const [cargoDepartamento, setCargoDepartamento] = useState("");
@@ -149,7 +152,6 @@ function App() {
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       if (user) {
-        // Se o email for de admin e a senha padrão foi usada, a flag de admin pode ser definida
         const storedAdmin = localStorage.getItem("isAdmin") === "true";
         setCurrentUser({ ...user, isAdmin: storedAdmin });
       } else {
@@ -232,7 +234,7 @@ function App() {
       });
   };
 
-  // Função de criação de ticket com upload de anexos
+  // Função de criação de ticket com upload de anexos usando setDoc
   const handleCreateTicket = async (e) => {
     e.preventDefault();
     console.log("Iniciando criação do chamado...");
@@ -264,7 +266,7 @@ function App() {
     const prazoFinalizacaoDate = addBusinessDays(dataDeAbertura, daysToAdd);
     const prazoFinalizacao = prazoFinalizacaoDate.toISOString();
 
-    // Upload dos anexos para o Firebase Storage
+    // Upload dos anexos para o Storage
     let attachmentURLs = [];
     if (newTicketFiles.length > 0) {
       for (const file of newTicketFiles) {
@@ -300,8 +302,8 @@ function App() {
     };
 
     try {
-      console.log("Chamando addDoc...");
-      await addDoc(collection(db, 'tickets'), newTicket);
+      console.log("Chamando setDoc...");
+      await setDoc(doc(db, 'tickets', ticketId), newTicket);
       console.log("Ticket salvo no Firestore com sucesso!");
       sendTicketUpdateEmail(newTicket, "Abertura de novo chamado");
     } catch (error) {
@@ -562,7 +564,28 @@ function App() {
               </div>
               <div className="mb-2">
                 <label className="block font-semibold">Categoria:</label>
-                <p className="py-1">{categoria || "Não definido"}</p>
+                <select
+                  value={categoria}
+                  onChange={(e) => {
+                    if (e.target.value === "+Novo") {
+                      const novaCategoria = prompt("Digite a nova categoria:");
+                      if (novaCategoria) {
+                        const filtered = categoryOptions.filter(opt => opt !== "+Novo");
+                        setCategoryOptions([...filtered, novaCategoria, "+Novo"]);
+                        setCategoria(novaCategoria);
+                      }
+                    } else {
+                      setCategoria(e.target.value);
+                    }
+                  }}
+                  required
+                  className="border rounded px-2 py-1 w-full"
+                >
+                  <option value="" disabled>Selecione</option>
+                  {categoryOptions.map((option, idx) => (
+                    <option key={idx} value={option}>{option}</option>
+                  ))}
+                </select>
               </div>
               <div className="mb-2">
                 <label className="block font-semibold">Prioridade:</label>
@@ -615,6 +638,16 @@ function App() {
       )}
     </div>
   );
+}
+
+// Função para validar que o nome do solicitante é composto com iniciais em maiúsculas
+function isValidSolicitanteName(name) {
+  const parts = name.trim().split(/\s+/);
+  if (parts.length < 2) return false;
+  for (const part of parts) {
+    if (part[0] !== part[0].toUpperCase()) return false;
+  }
+  return true;
 }
 
 export default App;
