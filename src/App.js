@@ -16,9 +16,8 @@ import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import TicketList from './TicketList.js';
 import TicketListAdmin from './TicketListAdmin.js';
 
-// (1) Import do ReactQuill
 import ReactQuill from 'react-quill';
-import 'quill/dist/quill.snow.css';
+import './quill.snow.css'; // import local
 
 const initialCargoOptions = [
   "Aquisição",
