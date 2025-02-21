@@ -9,13 +9,8 @@ import {
   doc,
   updateDoc
 } from 'firebase/firestore';
-import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { db, storage } from './firebase-config.js';
-
-// ReactQuill
-import ReactQuill from 'react-quill';
-import 'react-quill/dist/quill.snow.css';
-
 import { StarRating } from './utils.js';
 
 const priorityOptions = [
@@ -29,18 +24,14 @@ const TicketList = ({ currentUser, activeTab, onSendEmail, calculateSLA }) => {
   const [tickets, setTickets] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  // Edição do ticket
+  // Estados para edição (usuário comum)
   const [editTicketId, setEditTicketId] = useState(null);
-
-  // Rich text para descrição
-  const [editDescricaoHTML, setEditDescricaoHTML] = useState("");
-  // Rich text para comentário
-  const [editComentarioHTML, setEditComentarioHTML] = useState("");
-
+  const [editDescricao, setEditDescricao] = useState("");
   const [editPrioridade, setEditPrioridade] = useState("");
+  const [editComentario, setEditComentario] = useState("");
   const [editFiles, setEditFiles] = useState([]);
 
-  // Avaliação
+  // Estados para avaliação via estrelas
   const [showEvaluation, setShowEvaluation] = useState(false);
   const [ratingValue, setRatingValue] = useState(0);
   const [ticketToEvaluate, setTicketToEvaluate] = useState(null);
@@ -59,10 +50,10 @@ const TicketList = ({ currentUser, activeTab, onSendEmail, calculateSLA }) => {
           id: docSnap.id,
           ...docSnap.data()
         }));
-        // Filtro de status (open vs closed)
-        const filtered = (activeTab === 'open')
-          ? all.filter(tk => tk.status !== 'Concluído')
-          : all.filter(tk => tk.status === 'Concluído');
+        // Filtrar pela aba: "open" = não concluídos; "closed" = concluídos
+        const filtered = activeTab === 'open'
+          ? all.filter(ticket => ticket.status !== 'Concluído')
+          : all.filter(ticket => ticket.status === 'Concluído');
         setTickets(filtered);
         setLoading(false);
       },
@@ -74,10 +65,10 @@ const TicketList = ({ currentUser, activeTab, onSendEmail, calculateSLA }) => {
     return () => unsubscribe();
   }, [currentUser, activeTab]);
 
-  // Reabrir Chamado (bloqueado se já foi avaliado)
+  // Reabertura: bloqueia se o ticket já foi avaliado
   const handleReopenTicket = async (ticket) => {
     if (ticket.avaliacao) {
-      alert("Este chamado já foi avaliado e não pode mais ser reaberto.");
+      alert("Este chamado já foi avaliado e não pode ser reaberto.");
       return;
     }
     const reason = prompt("Descreva o motivo da reabertura:");
@@ -88,7 +79,6 @@ const TicketList = ({ currentUser, activeTab, onSendEmail, calculateSLA }) => {
     let newComentarios = ticket.comentarios || [];
     newComentarios.push({
       autor: ticket.nomeSolicitante || "Usuário",
-      // Se quiser formatar esse “reason” também, precisaria de um Quill só pra reabertura.
       texto: `**Reabertura**: ${reason}`,
       createdAt: new Date().toISOString()
     });
@@ -108,7 +98,7 @@ const TicketList = ({ currentUser, activeTab, onSendEmail, calculateSLA }) => {
     }
   };
 
-  // Avaliar Chamado (Estrelas)
+  // Avaliação via estrelas
   const handleEvaluateTicket = (ticket) => {
     setTicketToEvaluate(ticket);
     setRatingValue(ticket.avaliacao || 0);
@@ -122,9 +112,7 @@ const TicketList = ({ currentUser, activeTab, onSendEmail, calculateSLA }) => {
     };
     try {
       await updateDoc(doc(db, 'tickets', ticketToEvaluate.id), updateData);
-      if (onSendEmail) {
-        onSendEmail({ ...ticketToEvaluate, ...updateData }, "Chamado avaliado pelo usuário");
-      }
+      if (onSendEmail) onSendEmail({ ...ticketToEvaluate, ...updateData }, "Chamado avaliado pelo usuário");
     } catch (error) {
       console.error("Erro ao avaliar ticket:", error);
       alert("Falha ao avaliar o ticket.");
@@ -134,25 +122,23 @@ const TicketList = ({ currentUser, activeTab, onSendEmail, calculateSLA }) => {
     setRatingValue(0);
   };
 
-  // Iniciar Edição
+  // Iniciar edição (usuário)
   const startEditTicket = (ticket) => {
     setEditTicketId(ticket.id);
-    setEditDescricaoHTML(ticket.descricaoProblema || "");
+    setEditDescricao(ticket.descricaoProblema || "");
     setEditPrioridade(ticket.prioridade || "");
-    setEditComentarioHTML("");
+    setEditComentario("");
     setEditFiles([]);
   };
 
-  // Cancelar Edição
   const cancelEditTicket = () => {
     setEditTicketId(null);
-    setEditDescricaoHTML("");
+    setEditDescricao("");
     setEditPrioridade("");
-    setEditComentarioHTML("");
+    setEditComentario("");
     setEditFiles([]);
   };
 
-  // Salvar Edição
   const saveEditTicket = async (ticket) => {
     let newAttachments = ticket.attachments || [];
     if (editFiles.length > 0) {
@@ -167,29 +153,23 @@ const TicketList = ({ currentUser, activeTab, onSendEmail, calculateSLA }) => {
         }
       }
     }
-
     let newComentarios = ticket.comentarios || [];
-    if (editComentarioHTML.trim()) {
-      // Armazenamos o comentário como HTML
+    if (editComentario.trim()) {
       newComentarios.push({
         autor: ticket.nomeSolicitante || "Usuário",
-        texto: editComentarioHTML,   // HTML do Quill
+        texto: editComentario,
         createdAt: new Date().toISOString()
       });
     }
-
     const updateData = {
-      descricaoProblema: editDescricaoHTML, // HTML do Quill
+      descricaoProblema: editDescricao,
       prioridade: editPrioridade,
       attachments: newAttachments,
       comentarios: newComentarios
     };
-
     try {
       await updateDoc(doc(db, 'tickets', ticket.id), updateData);
-      if (onSendEmail) {
-        onSendEmail({ ...ticket, ...updateData }, "Chamado editado pelo usuário");
-      }
+      if (onSendEmail) onSendEmail({ ...ticket, ...updateData }, "Chamado editado pelo usuário");
       cancelEditTicket();
     } catch (error) {
       console.error("Erro ao atualizar ticket:", error);
@@ -204,7 +184,7 @@ const TicketList = ({ currentUser, activeTab, onSendEmail, calculateSLA }) => {
     <div>
       <h2 className="text-xl font-bold mb-4">Meus Chamados</h2>
 
-      {/* Modal de Avaliação */}
+      {/* Modal para Avaliação via Estrelas */}
       {showEvaluation && ticketToEvaluate && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center">
           <div className="bg-white p-4 rounded">
@@ -232,170 +212,87 @@ const TicketList = ({ currentUser, activeTab, onSendEmail, calculateSLA }) => {
         </div>
       )}
 
-      {tickets.map(ticket => {
-        const isConcluido = (ticket.status === "Concluído");
-        const isAvaliado = !!ticket.avaliacao;
+      {tickets.map(ticket => (
+        <div key={ticket.id} className="border rounded p-2 mb-2 bg-white">
+          {/* Ordem de exibição para o usuário */}
+          <p><strong>Descrição:</strong> {ticket.descricaoProblema}</p>
+          <p><strong>Data de Abertura:</strong> {ticket.dataDeAbertura}</p>
+          <p><strong>Prioridade:</strong> {ticket.prioridade}</p>
+          <p><strong>Status:</strong> {ticket.status}</p>
 
-        if (editTicketId === ticket.id) {
-          // ---------- EDIÇÃO ----------
-          return (
-            <div key={ticket.id} className="border rounded p-2 mb-2 bg-white">
-              <p><strong>Status:</strong> {ticket.status}</p>
-
-              <label className="block font-semibold mt-2">Prioridade:</label>
-              <select
-                className="border px-2 py-1 rounded w-full"
-                value={editPrioridade}
-                onChange={(e) => setEditPrioridade(e.target.value)}
-              >
-                <option value="">Selecione</option>
-                {priorityOptions.map((opt, i) => (
-                  <option key={i} value={opt}>{opt}</option>
+          {ticket.comentarios && ticket.comentarios.length > 0 && (
+            <div>
+              <strong>Comentários:</strong>
+              <ul style={{ fontSize: '0.9rem' }}>
+                {ticket.comentarios.map((com, idx) => (
+                  <li key={idx} className="ml-4 list-disc">
+                    <strong>{com.autor}:</strong> {com.texto}
+                  </li>
                 ))}
-              </select>
-
-              <label className="block font-semibold mt-2">Descrição do Problema (Rich Text):</label>
-              <ReactQuill
-                value={editDescricaoHTML}
-                onChange={setEditDescricaoHTML}
-                theme="snow"
-                style={{ minHeight: "120px", backgroundColor: "#fff" }}
-              />
-
-              <label className="block font-semibold mt-2">Adicionar Comentário (Rich Text):</label>
-              <ReactQuill
-                value={editComentarioHTML}
-                onChange={setEditComentarioHTML}
-                theme="snow"
-                style={{ minHeight: "80px", backgroundColor: "#fff" }}
-              />
-
-              <label className="block font-semibold mt-2">Anexar novos arquivos:</label>
-              <input
-                type="file"
-                multiple
-                onChange={(e) => setEditFiles(Array.from(e.target.files))}
-                className="mt-1"
-              />
-
-              <div className="flex gap-2 mt-4">
-                <button
-                  onClick={() => saveEditTicket(ticket)}
-                  className="px-2 py-1 bg-blue-500 text-white rounded"
-                >
-                  Salvar
-                </button>
-                <button
-                  onClick={cancelEditTicket}
-                  className="px-2 py-1 bg-gray-300 rounded"
-                >
-                  Cancelar
-                </button>
-              </div>
+              </ul>
             </div>
-          );
-        } else {
-          // ---------- VISUALIZAÇÃO ----------
-          return (
-            <div key={ticket.id} className="border rounded p-2 mb-2 bg-white">
-              {/* Ordem de exibição: Descrição, Data de Abertura, Prioridade, Status, Comentários, Anexos */}
+          )}
 
-              {/* Descrição (HTML) */}
-              <div>
-                <strong>Descrição:</strong>
-                <div
-                  style={{ fontSize: "0.95rem" }}
-                  dangerouslySetInnerHTML={{ __html: ticket.descricaoProblema }}
-                />
-              </div>
-
-              <p><strong>Data de Abertura:</strong> {ticket.dataDeAbertura}</p>
-              <p><strong>Prioridade:</strong> {ticket.prioridade}</p>
-              <p><strong>Status:</strong> {ticket.status}</p>
-
-              {/* Comentários (HTML) */}
-              {ticket.comentarios && ticket.comentarios.length > 0 && (
-                <div>
-                  <strong>Comentários:</strong>
-                  <ul style={{ fontSize: '0.9rem' }}>
-                    {ticket.comentarios.map((com, idx) => (
-                      <li key={idx} className="ml-4 list-disc">
-                        <strong>{com.autor}:</strong>{" "}
-                        <div
-                          style={{ display: "inline-block" }}
-                          dangerouslySetInnerHTML={{ __html: com.texto }}
-                        />
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-
-              {/* Anexos */}
-              {ticket.attachments && ticket.attachments.length > 0 && (
-                <div>
-                  <strong>Anexos:</strong>
-                  <ul>
-                    {ticket.attachments.map((att, i) => (
-                      <li key={i}>
-                        <a
-                          href={att.url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          style={{
-                            color: 'blue',
-                            textDecoration: 'underline',
-                            fontSize: '0.85rem'
-                          }}
-                        >
-                          {att.name}
-                        </a>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-
-              {/* Botões */}
-              {isConcluido ? (
-                <div className="mt-2 flex gap-2">
-                  {/* Se avaliado, não mostra Reabrir */}
-                  {!isAvaliado && (
-                    <button
-                      onClick={() => handleReopenTicket(ticket)}
-                      className="px-2 py-1 rounded bg-blue-500 text-white"
+          {ticket.attachments && ticket.attachments.length > 0 && (
+            <div>
+              <strong>Anexos:</strong>
+              <ul>
+                {ticket.attachments.map((att, idx) => (
+                  <li key={idx}>
+                    <a
+                      href={att.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={{
+                        color: 'blue',
+                        textDecoration: 'underline',
+                        fontSize: '0.85rem'
+                      }}
                     >
-                      Reabrir Chamado
-                    </button>
-                  )}
-                  {ticket.avaliacao ? (
-                    <div>
-                      <p className="inline-block mr-2">Chamado Avaliado:</p>
-                      <StarRating rating={ticket.avaliacao} setRating={()=>{}} readOnly={true} />
-                    </div>
-                  ) : (
-                    <button
-                      onClick={() => handleEvaluateTicket(ticket)}
-                      className="px-2 py-1 rounded bg-green-500 text-white"
-                    >
-                      Avaliar Chamado
-                    </button>
-                  )}
+                      {att.name}
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {ticket.status === 'Concluído' ? (
+            <div className="mt-2 flex gap-2">
+              {!ticket.avaliacao && (
+                <button
+                  onClick={() => handleReopenTicket(ticket)}
+                  className="px-2 py-1 rounded bg-blue-500 text-white"
+                >
+                  Reabrir Chamado
+                </button>
+              )}
+              {ticket.avaliacao ? (
+                <div>
+                  <p className="inline-block mr-2">Chamado Avaliado:</p>
+                  <StarRating rating={ticket.avaliacao} setRating={() => {}} readOnly={true} />
                 </div>
               ) : (
-                <div className="mt-2">
-                  <button
-                    onClick={() => startEditTicket(ticket)}
-                    className="px-2 py-1 bg-green-500 text-white rounded"
-                  >
-                    Editar Chamado
-                  </button>
-                </div>
+                <button
+                  onClick={() => handleEvaluateTicket(ticket)}
+                  className="px-2 py-1 rounded bg-green-500 text-white"
+                >
+                  Avaliar Chamado
+                </button>
               )}
             </div>
-          );
-        }
-      })}
+          ) : (
+            <div className="mt-2">
+              <button
+                onClick={() => startEditTicket(ticket)}
+                className="px-2 py-1 bg-green-500 text-white rounded"
+              >
+                Editar Chamado
+              </button>
+            </div>
+          )}
+        </div>
+      ))}
     </div>
   );
 };
