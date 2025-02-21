@@ -14,7 +14,7 @@ import { db, auth, storage } from './firebase-config.js';
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 
 // Componentes de listagem
-import TicketList from './TicketList.js';         // Visualização resumida para usuários comuns (inclui botões de reabertura e avaliação)
+import TicketList from './TicketList.js';         // Visualização resumida para usuários comuns
 import TicketListAdmin from './TicketListAdmin.js'; // Visualização completa para admin
 
 // Constantes e configurações
@@ -71,19 +71,15 @@ function generateTicketId() {
   return id;
 }
 
-// Função para calcular SLA automaticamente (em minutos, horas ou dias)
+// Calcula a SLA com base na diferença entre data de abertura e de resolução
 function calculateSLA(dataDeAberturaISO, dataResolucaoISO) {
   const start = new Date(dataDeAberturaISO);
   const end = new Date(dataResolucaoISO);
   const diffMs = end - start;
   const diffMinutes = Math.floor(diffMs / 60000);
-  if (diffMinutes < 60) {
-    return diffMinutes + " minuto(s)";
-  }
+  if (diffMinutes < 60) return diffMinutes + " minuto(s)";
   const diffHours = Math.floor(diffMinutes / 60);
-  if (diffHours < 24) {
-    return diffHours + " hora(s)";
-  }
+  if (diffHours < 24) return diffHours + " hora(s)";
   const diffDays = Math.floor(diffHours / 24);
   return diffDays + " dia(s)";
 }
@@ -98,10 +94,8 @@ async function sendTicketUpdateEmail(ticket, updateDescription) {
     `Descrição: ${ticket.descricaoProblema}\n` +
     `Link de acesso: https://fin-desk.vercel.app/`;
   console.log(`Enviando email para ${ticket.emailSolicitante} e para jonathan.kauer@guiainvest.com.br`);
-
   const url = "https://script.google.com/macros/s/AKfycbz2xFbYeeP4sp8JdNeT2JxkeHk5SEDYrYOF37NizSPlAaG7J6KjekAWECVr6NPTJkUN/exec";
   const emails = ["jonathan.kauer@guiainvest.com.br", ticket.emailSolicitante];
-
   try {
     await Promise.all(
       emails.map(email => {
@@ -121,7 +115,7 @@ async function sendTicketUpdateEmail(ticket, updateDescription) {
   }
 }
 
-// Função para validar se o nome do solicitante é composto com iniciais em maiúsculas
+// Valida se o nome do solicitante é composto com iniciais em maiúsculas
 function isValidSolicitanteName(name) {
   const parts = name.trim().split(/\s+/);
   if (parts.length < 2) return false;
@@ -139,9 +133,7 @@ function App() {
   const [signupPassword, setSignupPassword] = useState("");
   const [isLoginScreen, setIsLoginScreen] = useState(true);
   const [activeTab, setActiveTab] = useState("open");
-
-  // Estado para o toggle de modo admin (apenas para usuários com a claim admin)
-  const [modoAdmin, setModoAdmin] = useState(true);
+  const [modoAdmin, setModoAdmin] = useState(true); // Toggle para admins
 
   // Filtros de admin
   const [adminFilterPriority, setAdminFilterPriority] = useState("");
@@ -165,7 +157,6 @@ function App() {
     "+Novo"
   ]);
 
-  // Persistência do login via onAuthStateChanged
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       if (user) {
@@ -252,7 +243,6 @@ function App() {
       });
   };
 
-  // Função de criação de ticket com upload de anexos usando setDoc
   const handleCreateTicket = async (e) => {
     e.preventDefault();
     console.log("Iniciando criação do chamado...");
@@ -279,7 +269,6 @@ function App() {
     const dataDeAbertura = new Date();
     const dataDeAberturaISO = dataDeAbertura.toISOString();
     const dataDeAberturaDisplay = dataDeAbertura.toLocaleString();
-
     const daysToAdd = priorityDaysMapping[prioridade] || 0;
     const prazoFinalizacaoDate = addBusinessDays(dataDeAbertura, daysToAdd);
     const prazoFinalizacao = prazoFinalizacaoDate.toISOString();
@@ -313,7 +302,7 @@ function App() {
       prazoFinalizacao,
       status: "Aberto",
       dataResolucao: "",
-      sla: "", // Será calculada automaticamente quando o ticket for concluído
+      sla: "",
       responsavel: "",
       comentarios: [],
       attachments: attachmentURLs,
@@ -489,7 +478,6 @@ function App() {
                 Concluídos
               </button>
             </div>
-
             {currentUser.isAdmin && modoAdmin && (
               <div className="flex flex-col sm:flex-row items-center gap-2">
                 <select
@@ -655,14 +643,14 @@ function App() {
                 filterCategory={adminFilterCategory}
                 filterAtendente={adminFilterAtendente}
                 onSendEmail={sendTicketUpdateEmail}
-                calculateSLA={calculateSLA} // Passa a função para calcular SLA
+                calculateSLA={calculateSLA}
               />
             ) : (
               <TicketList
                 activeTab={activeTab}
                 currentUser={currentUser}
                 onSendEmail={sendTicketUpdateEmail}
-                calculateSLA={calculateSLA} // Para que o TicketList possa exibir SLA, reabertura e avaliação se implementados
+                calculateSLA={calculateSLA}
               />
             )}
           </div>
