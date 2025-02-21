@@ -120,8 +120,18 @@ const TicketListAdmin = ({
 
     let newComentarios = ticket.comentarios || [];
     if (editComentario.trim()) {
-      // Usa o displayName do admin ou "Admin" caso não exista
-      const autor = (currentUser && currentUser.displayName) || "Admin";
+      // Mapeia o e-mail do admin para o nome desejado
+      let autor = "Admin";
+      if (currentUser && currentUser.email) {
+        if (currentUser.email === "jonathan.kauer@guiainvest.com.br") {
+          autor = "Jonathan Kauer";
+        } else if (currentUser.email === "nayla.martins@guiainvest.com.br") {
+          autor = "Nayla Martins";
+        } else {
+          // Caso o displayName esteja disponível, usa-o
+          autor = currentUser.displayName || currentUser.email.split('@')[0];
+        }
+      }
       newComentarios.push({
         autor,
         texto: editComentario,
