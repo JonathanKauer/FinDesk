@@ -141,50 +141,56 @@ const TicketList = ({ currentUser, activeTab, onSendEmail, calculateSLA }) => {
     setEditFiles([]);
   };
 
-  const saveEditTicket = async (ticket) => {
-    let newAttachments = ticket.attachments || [];
+// Dentro da função saveEditTicket em TicketList.jsx
 
-    // Upload de novos anexos
-    if (editFiles.length > 0) {
-      for (const file of editFiles) {
-        try {
-          const storageRef = ref(storage, `tickets/${ticket.id}/${file.name}`);
-          await uploadBytes(storageRef, file);
-          const downloadURL = await getDownloadURL(storageRef);
-          newAttachments.push({ url: downloadURL, name: file.name });
-        } catch (error) {
-          console.error("Erro ao fazer upload de arquivo:", error);
-        }
+const saveEditTicket = async (ticket) => {
+  let newAttachments = ticket.attachments || [];
+
+  // Upload de novos anexos
+  if (editFiles.length > 0) {
+    for (const file of editFiles) {
+      try {
+        const storageRef = ref(storage, `tickets/${ticket.id}/${file.name}`);
+        await uploadBytes(storageRef, file);
+        const downloadURL = await getDownloadURL(storageRef);
+        newAttachments.push({ url: downloadURL, name: file.name });
+      } catch (error) {
+        console.error("Erro ao fazer upload de arquivo:", error);
       }
     }
+  }
 
-    let newComentarios = ticket.comentarios || [];
-    if (editComentario.trim()) {
-      newComentarios.push({
-        autor: ticket.nomeSolicitante || "Usuário",
-        texto: editComentario,
-        createdAt: new Date().toISOString()
-      });
-    }
+  let newComentarios = ticket.comentarios || [];
+  if (editComentario.trim()) {
+    // Define o autor para contas de usuário comuns:
+    const autor = ticket.nomeSolicitante ||
+      (currentUser && (currentUser.displayName || currentUser.email.split('@')[0])) ||
+      "Usuário";
+    newComentarios.push({
+      autor,
+      texto: editComentario,
+      createdAt: new Date().toISOString()
+    });
+  }
 
-    const updateData = {
-      descricaoProblema: editDescricao,
-      prioridade: editPrioridade,
-      attachments: newAttachments,
-      comentarios: newComentarios
-    };
-
-    try {
-      await updateDoc(doc(db, 'tickets', ticket.id), updateData);
-      if (onSendEmail) {
-        onSendEmail({ ...ticket, ...updateData }, "Chamado editado pelo usuário");
-      }
-      cancelEditTicket();
-    } catch (error) {
-      console.error("Erro ao atualizar ticket:", error);
-      alert("Falha ao atualizar o ticket.");
-    }
+  const updateData = {
+    descricaoProblema: editDescricao,
+    prioridade: editPrioridade,
+    attachments: newAttachments,
+    comentarios: newComentarios
   };
+
+  try {
+    await updateDoc(doc(db, 'tickets', ticket.id), updateData);
+    if (onSendEmail) {
+      onSendEmail({ ...ticket, ...updateData }, "Chamado editado pelo usuário");
+    }
+    cancelEditTicket();
+  } catch (error) {
+    console.error("Erro ao atualizar ticket:", error);
+    alert("Falha ao atualizar o ticket.");
+  }
+};
 
   if (loading) return <p>Carregando seus chamados...</p>;
   if (tickets.length === 0) return <p>Nenhum chamado encontrado.</p>;
