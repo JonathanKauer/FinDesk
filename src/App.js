@@ -14,10 +14,10 @@ import { db, auth, storage } from './firebase-config.js';
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 
 // Componentes de listagem
-import TicketList from './TicketList.js';         // Para usuário comum (visualização resumida)
-import TicketListAdmin from './TicketListAdmin.js'; // Para admin
+import TicketList from './TicketList.js';         // Visualização resumida para usuários comuns
+import TicketListAdmin from './TicketListAdmin.js'; // Visualização completa para admin
 
-// Configurações e constantes
+// Constantes e configurações
 const ADMIN_DEFAULT_PASSWORD = "admin123@guiainvestgpt";
 const adminEmails = ["jonathan.kauer@guiainvest.com.br", "nayla.martins@guiainvest.com.br"];
 
@@ -104,7 +104,7 @@ async function sendTicketUpdateEmail(ticket, updateDescription) {
   }
 }
 
-// Declaração única da função de validação do nome do solicitante
+// Valida se o nome é composto e se as iniciais de cada palavra estão em maiúsculas
 function isValidSolicitanteName(name) {
   const parts = name.trim().split(/\s+/);
   if (parts.length < 2) return false;
@@ -116,15 +116,15 @@ function isValidSolicitanteName(name) {
 
 function App() {
   const [currentUser, setCurrentUser] = useState(null);
-
-  // Estados para login e cadastro
   const [loginEmail, setLoginEmail] = useState("");
   const [loginPassword, setLoginPassword] = useState("");
   const [signupEmail, setSignupEmail] = useState("");
   const [signupPassword, setSignupPassword] = useState("");
   const [isLoginScreen, setIsLoginScreen] = useState(true);
-
   const [activeTab, setActiveTab] = useState("open");
+
+  // Estado para o toggle de modo (para admins que podem atuar como usuários comuns)
+  const [modoAdmin, setModoAdmin] = useState(true);
 
   // Filtros de admin
   const [adminFilterPriority, setAdminFilterPriority] = useState("");
@@ -152,8 +152,10 @@ function App() {
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       if (user) {
-        const storedAdmin = localStorage.getItem("isAdmin") === "true";
-        setCurrentUser({ ...user, isAdmin: storedAdmin });
+        user.getIdTokenResult().then(idTokenResult => {
+          const isAdminClaim = !!idTokenResult.claims.admin;
+          setCurrentUser({ ...user, isAdmin: isAdminClaim });
+        });
       } else {
         setCurrentUser(null);
       }
@@ -170,12 +172,11 @@ function App() {
     signInWithEmailAndPassword(auth, loginEmail, loginPassword)
       .then((userCredential) => {
         const user = userCredential.user;
-        const isDefaultAdmin =
-          adminEmails.includes(loginEmail.toLowerCase()) &&
-          loginPassword === ADMIN_DEFAULT_PASSWORD;
-        console.log("Usuário logado com sucesso:", user.uid, "isAdmin:", isDefaultAdmin);
-        localStorage.setItem("isAdmin", isDefaultAdmin ? "true" : "false");
-        setCurrentUser({ ...user, isAdmin: isDefaultAdmin });
+        user.getIdTokenResult().then(idTokenResult => {
+          const isAdminClaim = !!idTokenResult.claims.admin;
+          console.log("Usuário logado com sucesso:", user.uid, "isAdmin:", isAdminClaim);
+          setCurrentUser({ ...user, isAdmin: isAdminClaim });
+        });
         setLoginEmail("");
         setLoginPassword("");
       })
@@ -434,6 +435,18 @@ function App() {
             </button>
           </div>
 
+          {currentUser.isAdmin && (
+            <div className="flex justify-center mb-4">
+              <button
+                onClick={() => setModoAdmin(!modoAdmin)}
+                className="px-3 py-1 rounded shadow"
+                style={{ backgroundColor: modoAdmin ? "#0E1428" : "#FF5E00", color: "white" }}
+              >
+                {modoAdmin ? "Modo Admin" : "Modo Usuário Comum"}
+              </button>
+            </div>
+          )}
+
           <div className="flex flex-col items-center mb-4">
             <div className="flex gap-4 mb-4">
               <button
@@ -460,7 +473,7 @@ function App() {
               </button>
             </div>
 
-            {currentUser.isAdmin && (
+            {currentUser.isAdmin && modoAdmin && (
               <div className="flex flex-col sm:flex-row items-center gap-2">
                 <select
                   value={adminFilterPriority}
@@ -496,7 +509,7 @@ function App() {
             )}
           </div>
 
-          {!currentUser.isAdmin && (
+          {(!currentUser.isAdmin || (currentUser.isAdmin && !modoAdmin)) && (
             <div className="mb-4 flex justify-center">
               <button
                 onClick={() => setShowNewTicketForm(true)}
@@ -618,7 +631,7 @@ function App() {
           )}
 
           <div className="mt-8 w-full max-w-5xl mx-auto">
-            {currentUser.isAdmin ? (
+            {currentUser.isAdmin && modoAdmin ? (
               <TicketListAdmin
                 activeTab={activeTab}
                 filterPriority={adminFilterPriority}
