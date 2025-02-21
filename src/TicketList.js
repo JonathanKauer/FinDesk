@@ -9,7 +9,7 @@ const TicketList = ({ currentUser, activeTab, onSendEmail, calculateSLA }) => {
 
   useEffect(() => {
     if (!currentUser) return;
-    // Busca somente os tickets do usuário
+    // Busca os tickets do usuário
     const q = query(
       collection(db, 'tickets'),
       where('userId', '==', currentUser.uid),
@@ -29,7 +29,7 @@ const TicketList = ({ currentUser, activeTab, onSendEmail, calculateSLA }) => {
     return () => unsubscribe();
   }, [currentUser, activeTab]);
 
-  // Reabre um ticket concluído: atualiza o status para "Aberto" e limpa datas de resolução/SLA
+  // Reabre um ticket concluído: atualiza o status para "Aberto" e limpa as datas de resolução e SLA
   const handleReopenTicket = async (ticket) => {
     try {
       const ticketRef = doc(db, 'tickets', ticket.id);
@@ -41,12 +41,12 @@ const TicketList = ({ currentUser, activeTab, onSendEmail, calculateSLA }) => {
     }
   };
 
-  // Avalia o ticket (exemplo simples: prompt para nota)
+  // Avalia um ticket: exemplo simples solicitando uma nota via prompt
   const handleEvaluateTicket = (ticket) => {
     const rating = prompt("Avalie o chamado (de 1 a 5):");
     if (rating) {
-      // Aqui você pode, por exemplo, atualizar o ticket com a avaliação ou enviar para um backend
       alert(`Você avaliou o ticket ${ticket.id} com nota ${rating}.`);
+      // Aqui, você pode implementar a atualização do ticket com a avaliação, se desejar.
     }
   };
 
@@ -79,10 +79,16 @@ const TicketList = ({ currentUser, activeTab, onSendEmail, calculateSLA }) => {
           )}
           {ticket.status === "Concluído" && (
             <div className="mt-2 flex gap-2">
-              <button onClick={() => handleReopenTicket(ticket)} className="px-2 py-1 rounded bg-blue-500 text-white">
+              <button
+                onClick={() => handleReopenTicket(ticket)}
+                className="px-2 py-1 rounded bg-blue-500 text-white"
+              >
                 Reabrir Chamado
               </button>
-              <button onClick={() => handleEvaluateTicket(ticket)} className="px-2 py-1 rounded bg-green-500 text-white">
+              <button
+                onClick={() => handleEvaluateTicket(ticket)}
+                className="px-2 py-1 rounded bg-green-500 text-white"
+              >
                 Avaliar Chamado
               </button>
             </div>
