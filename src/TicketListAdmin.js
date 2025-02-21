@@ -11,7 +11,19 @@ import {
 } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { db, storage } from './firebase-config.js';
-import { StarRating } from './utils.js'; // se quiser exibir nota em estrelas
+
+// ReactQuill
+import ReactQuill from 'react-quill';
+import 'react-quill/dist/quill.snow.css';
+
+import { StarRating } from './utils.js';
+
+const priorityOptions = [
+  "Baixa (7 dias úteis)",
+  "Média (5 dias úteis)",
+  "Alta (2 dias úteis)",
+  "Urgente (1 dia útil)"
+];
 
 const TicketListAdmin = ({
   activeTab,
@@ -27,10 +39,13 @@ const TicketListAdmin = ({
 
   // Edição do Admin
   const [editTicketId, setEditTicketId] = useState(null);
+
+  const [editDescricaoHTML, setEditDescricaoHTML] = useState("");  
+  const [editComentarioHTML, setEditComentarioHTML] = useState("");  
   const [editStatus, setEditStatus] = useState("");
   const [editResponsavel, setEditResponsavel] = useState("");
-  const [editComentario, setEditComentario] = useState("");
   const [editFiles, setEditFiles] = useState([]);
+  const [editPrioridade, setEditPrioridade] = useState("");
 
   useEffect(() => {
     const q = query(
@@ -56,7 +71,6 @@ const TicketListAdmin = ({
           list = list.filter((tk) => tk.responsavel === filterAtendente);
         }
 
-        // Aba "open" vs "closed"
         if (activeTab === 'open') {
           list = list.filter((tk) => tk.status !== 'Concluído');
         } else {
@@ -74,7 +88,6 @@ const TicketListAdmin = ({
     return () => unsubscribe();
   }, [activeTab, filterPriority, filterCategory, filterAtendente]);
 
-  // Excluir Chamado
   const handleDeleteTicket = async (ticketId) => {
     try {
       await deleteDoc(doc(db, 'tickets', ticketId));
@@ -88,17 +101,22 @@ const TicketListAdmin = ({
   // Iniciar Edição
   const startEditTicket = (ticket) => {
     setEditTicketId(ticket.id);
+    setEditDescricaoHTML(ticket.descricaoProblema || "");
     setEditStatus(ticket.status || "");
     setEditResponsavel(ticket.responsavel || "");
-    setEditComentario("");
+    setEditPrioridade(ticket.prioridade || "");
+    setEditComentarioHTML("");
     setEditFiles([]);
   };
 
+  // Cancelar Edição
   const cancelEditTicket = () => {
     setEditTicketId(null);
+    setEditDescricaoHTML("");
+    setEditComentarioHTML("");
     setEditStatus("");
     setEditResponsavel("");
-    setEditComentario("");
+    setEditPrioridade("");
     setEditFiles([]);
   };
 
@@ -119,24 +137,24 @@ const TicketListAdmin = ({
     }
 
     let newComentarios = ticket.comentarios || [];
-    if (editComentario.trim()) {
-      // Se quiser mapear email => "Jonathan Kauer" etc., faça aqui
-      const autor = (currentUser && currentUser.email) || "Admin";
+    if (editComentarioHTML.trim()) {
+      const autorAdmin = (currentUser && currentUser.email) || "Admin";
       newComentarios.push({
-        autor,
-        texto: editComentario,
+        autor: autorAdmin,
+        texto: editComentarioHTML, // HTML
         createdAt: new Date().toISOString()
       });
     }
 
     const updateData = {
-      attachments: newAttachments,
-      comentarios: newComentarios,
+      descricaoProblema: editDescricaoHTML, // HTML
       status: editStatus,
-      responsavel: editResponsavel
+      responsavel: editResponsavel,
+      prioridad: editPrioridade, 
+      attachments: newAttachments,
+      comentarios: newComentarios
     };
 
-    // Se marcar Concluído, define data e SLA
     if (editStatus === "Concluído") {
       const now = new Date();
       updateData.dataResolucaoISO = now.toISOString();
@@ -145,7 +163,6 @@ const TicketListAdmin = ({
         updateData.sla = calculateSLA(ticket.dataDeAberturaISO, updateData.dataResolucaoISO);
       }
     } else {
-      // Se voltar para Aberto/Em Andamento
       updateData.dataResolucaoISO = "";
       updateData.dataResolucao = "";
       updateData.sla = "";
@@ -171,13 +188,34 @@ const TicketListAdmin = ({
       <h2 className="text-xl font-bold mb-4">Tickets Administrativos</h2>
       {tickets.map(ticket => {
         const isConcluido = (ticket.status === "Concluído");
+        const isEditMode = (editTicketId === ticket.id);
 
-        if (editTicketId === ticket.id) {
-          // ------ FORM DE EDIÇÃO (ADMIN) ------
+        // EDIÇÃO
+        if (isEditMode) {
           return (
             <div key={ticket.id} className="border rounded p-2 mb-2 bg-white">
-              {/* ID não é mais exibido em visualização normal, 
-                  mas aqui no form podemos deixar ou remover, tanto faz */}
+              {/* Admin Edit Form */}
+              {/* 1) Descrição (Rich Text) */}
+              <label className="block font-semibold mt-2">Descrição (Rich Text):</label>
+              <ReactQuill
+                value={editDescricaoHTML}
+                onChange={setEditDescricaoHTML}
+                theme="snow"
+                style={{ minHeight: "100px", backgroundColor: "#fff" }}
+              />
+
+              <label className="block mt-2 font-semibold">Prioridade:</label>
+              <select
+                value={editPrioridade}
+                onChange={(e) => setEditPrioridade(e.target.value)}
+                className="border px-2 py-1 rounded w-full"
+              >
+                <option value="">Selecione</option>
+                {priorityOptions.map((opt, i) => (
+                  <option key={i} value={opt}>{opt}</option>
+                ))}
+              </select>
+
               <label className="block mt-2 font-semibold">Status:</label>
               <select
                 value={editStatus}
@@ -189,7 +227,7 @@ const TicketListAdmin = ({
                 <option value="Concluído">Concluído</option>
               </select>
 
-              <label className="block mt-2 font-semibold">Responsável:</label>
+              <label className="block mt-2 font-semibold">Responsável (Atendente):</label>
               <select
                 value={editResponsavel}
                 onChange={(e) => setEditResponsavel(e.target.value)}
@@ -200,12 +238,13 @@ const TicketListAdmin = ({
                 <option value="Nayla Martins">Nayla Martins</option>
               </select>
 
-              <label className="block mt-2 font-semibold">Adicionar Comentário (Admin):</label>
-              <textarea
-                className="border px-2 py-1 rounded w-full"
-                rows={2}
-                value={editComentario}
-                onChange={(e) => setEditComentario(e.target.value)}
+              {/* Comentário (Rich Text) */}
+              <label className="block mt-2 font-semibold">Adicionar Comentário (Rich Text):</label>
+              <ReactQuill
+                value={editComentarioHTML}
+                onChange={setEditComentarioHTML}
+                theme="snow"
+                style={{ minHeight: "80px", backgroundColor: "#fff" }}
               />
 
               <label className="block mt-2 font-semibold">Anexar novos arquivos:</label>
@@ -233,48 +272,58 @@ const TicketListAdmin = ({
           );
         }
 
-        // ------ VISUALIZAÇÃO (ADMIN) ------
+        // VISUALIZAÇÃO
         return (
           <div key={ticket.id} className="border rounded p-2 mb-2 bg-white">
-            {/* (1) Solicitante */}
+            {/* 1) Solicitante */}
             <p><strong>Solicitante:</strong> {ticket.nomeSolicitante}</p>
 
-            {/* (2) Cargo/Departamento */}
+            {/* 2) Cargo/Departamento */}
             <p><strong>Cargo/Departamento:</strong> {ticket.cargoDepartamento}</p>
 
-            {/* (3) Categoria */}
+            {/* 3) Categoria */}
             <p><strong>Categoria:</strong> {ticket.categoria}</p>
 
-            {/* (4) Descrição */}
-            <p><strong>Descrição:</strong> {ticket.descricaoProblema}</p>
+            {/* 4) Descrição (HTML) */}
+            <div>
+              <strong>Descrição:</strong>
+              <div
+                style={{ fontSize: "0.95rem" }}
+                dangerouslySetInnerHTML={{ __html: ticket.descricaoProblema }}
+              />
+            </div>
 
-            {/* (5) Data de Abertura */}
+            {/* 5) Data de Abertura */}
             <p><strong>Data de Abertura:</strong> {ticket.dataDeAbertura}</p>
 
-            {/* (6) Prioridade */}
+            {/* 6) Prioridade */}
             <p><strong>Prioridade:</strong> {ticket.prioridade}</p>
 
-            {/* (7) Responsável */}
-            <p><strong>Responsável:</strong> {ticket.responsavel || "Não definido"}</p>
+            {/* 7) Responsável */}
+            <p><strong>Responsável (Atendente):</strong> {ticket.responsavel || "Não definido"}</p>
 
-            {/* (8) Status */}
+            {/* 8) Status */}
             <p><strong>Status:</strong> {ticket.status}</p>
 
-            {/* (9) Comentários */}
+            {/* 9) Comentários (HTML) */}
             {ticket.comentarios && ticket.comentarios.length > 0 && (
               <div>
                 <strong>Comentários:</strong>
                 <ul style={{ fontSize: '0.9rem' }}>
                   {ticket.comentarios.map((com, idx) => (
                     <li key={idx} className="ml-4 list-disc">
-                      <strong>{com.autor}:</strong> {com.texto}
+                      <strong>{com.autor}:</strong>{" "}
+                      <div
+                        style={{ display: 'inline-block' }}
+                        dangerouslySetInnerHTML={{ __html: com.texto }}
+                      />
                     </li>
                   ))}
                 </ul>
               </div>
             )}
 
-            {/* (10) Anexos (azul, sublinhado, fonte menor) */}
+            {/* 10) Anexos */}
             {ticket.attachments && ticket.attachments.length > 0 && (
               <div>
                 <strong>Anexos:</strong>
@@ -299,27 +348,25 @@ const TicketListAdmin = ({
               </div>
             )}
 
-            {/* (11) Data de Encerramento (se concluído) */}
+            {/* 11) Data de Encerramento (se concluído) */}
             {ticket.dataResolucao && (
               <p><strong>Data de Encerramento:</strong> {ticket.dataResolucao}</p>
             )}
 
-            {/* (12) SLA (se concluído) */}
+            {/* 12) SLA */}
             {ticket.sla && (
               <p><strong>SLA:</strong> {ticket.sla}</p>
             )}
 
-            {/* (13) Avaliação do Usuário (último item) */}
+            {/* 13) Avaliação do usuário */}
             {ticket.avaliacao && (
               <div>
                 <strong>Avaliação do Usuário:</strong>
-                <StarRating rating={ticket.avaliacao} setRating={() => {}} readOnly={true} />
+                <StarRating rating={ticket.avaliacao} setRating={()=>{}} readOnly={true} />
               </div>
             )}
 
-            {/* Botões de ação */}
             <div className="flex gap-2 mt-2">
-              {/* Editar só se não estiver concluído */}
               {!isConcluido && (
                 <button
                   onClick={() => startEditTicket(ticket)}
@@ -328,7 +375,6 @@ const TicketListAdmin = ({
                   Editar
                 </button>
               )}
-              {/* Excluir sempre */}
               <button
                 onClick={() => handleDeleteTicket(ticket.id)}
                 className="px-2 py-1 bg-red-500 text-white rounded"
