@@ -274,7 +274,6 @@ function App() {
           const downloadURL = await getDownloadURL(storageRef);
           attachmentURLs.push({ url: downloadURL, name: file.name });
           console.log("Adicionado anexo:", file.name, "URL:", downloadURL);
-          console.log("attachmentURLs parcial:", attachmentURLs);
         } catch (error) {
           console.error("Erro ao fazer upload do arquivo:", error);
         }
@@ -664,7 +663,7 @@ function App() {
                 filterAtendente={adminFilterAtendente}
                 onSendEmail={sendTicketUpdateEmail}
                 calculateSLA={calculateSLA}
-                currentUser={currentUser} // <-- Passa para o admin
+                currentUser={currentUser}
               />
             ) : (
               <TicketList
