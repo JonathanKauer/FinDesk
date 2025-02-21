@@ -13,12 +13,9 @@ import {
 import { db, auth, storage } from './firebase-config.js';
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 
-// Componentes de listagem
-import TicketList from './TicketList.js';         // Visualização resumida para usuários comuns
-import TicketListAdmin from './TicketListAdmin.js'; // Visualização completa para admin
+import TicketList from './TicketList.js';
+import TicketListAdmin from './TicketListAdmin.js';
 
-// Constantes e configurações
-const ADMIN_DEFAULT_PASSWORD = "admin123@guiainvestgpt"; // Apenas ilustrativo
 const adminEmails = ["jonathan.kauer@guiainvest.com.br", "nayla.martins@guiainvest.com.br"];
 
 const initialCargoOptions = [
@@ -40,8 +37,6 @@ const priorityOptions = [
   "Alta (2 dias úteis)",
   "Urgente (1 dia útil)"
 ];
-
-const atendenteOptions = ["Jonathan Kauer", "Nayla Martins"];
 
 const priorityDaysMapping = {
   "Baixa (7 dias úteis)": 7,
@@ -84,7 +79,6 @@ function calculateSLA(dataDeAberturaISO, dataResolucaoISO) {
   return diffDays + " dia(s)";
 }
 
-// Envio de email via Google Apps Script (exemplo)
 async function sendTicketUpdateEmail(ticket, updateDescription) {
   const subject = "Findesk: Atualização em chamado";
   const body =
@@ -95,6 +89,7 @@ async function sendTicketUpdateEmail(ticket, updateDescription) {
     `Descrição: ${ticket.descricaoProblema}\n` +
     `Link de acesso: https://fin-desk.vercel.app/`;
   console.log(`Enviando email para ${ticket.emailSolicitante} e para jonathan.kauer@guiainvest.com.br`);
+
   const url = "https://script.google.com/macros/s/AKfycbz2xFbYeeP4sp8JdNeT2JxkeHk5SEDYrYOF37NizSPlAaG7J6KjekAWECVr6NPTJkUN/exec";
   const emails = ["jonathan.kauer@guiainvest.com.br", ticket.emailSolicitante];
   try {
@@ -116,7 +111,6 @@ async function sendTicketUpdateEmail(ticket, updateDescription) {
   }
 }
 
-// Valida se o nome do solicitante é composto com iniciais em maiúsculas
 function isValidSolicitanteName(name) {
   const parts = name.trim().split(/\s+/);
   if (parts.length < 2) return false;
@@ -134,14 +128,14 @@ function App() {
   const [signupPassword, setSignupPassword] = useState("");
   const [isLoginScreen, setIsLoginScreen] = useState(true);
   const [activeTab, setActiveTab] = useState("open");
-  const [modoAdmin, setModoAdmin] = useState(true); // Toggle para admins
+  const [modoAdmin, setModoAdmin] = useState(true);
 
-  // Filtros de admin
+  // Filtros Admin
   const [adminFilterPriority, setAdminFilterPriority] = useState("");
   const [adminFilterCategory, setAdminFilterCategory] = useState("");
   const [adminFilterAtendente, setAdminFilterAtendente] = useState("");
 
-  // Estados do formulário de criação de ticket
+  // Formulário de criação
   const [showNewTicketForm, setShowNewTicketForm] = useState(false);
   const [newTicketNome, setNewTicketNome] = useState("");
   const [cargoDepartamento, setCargoDepartamento] = useState("");
@@ -161,7 +155,6 @@ function App() {
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       if (user) {
-        // Exemplo de verificação de admin no token
         user.getIdTokenResult().then(idTokenResult => {
           const isAdminClaim = !!idTokenResult.claims.admin;
           setCurrentUser({ ...user, isAdmin: isAdminClaim });
@@ -184,7 +177,6 @@ function App() {
         const user = userCredential.user;
         user.getIdTokenResult().then(idTokenResult => {
           const isAdminClaim = !!idTokenResult.claims.admin;
-          console.log("Usuário logado:", user.uid, "isAdmin:", isAdminClaim);
           setCurrentUser({ ...user, isAdmin: isAdminClaim });
         });
         setLoginEmail("");
@@ -208,7 +200,6 @@ function App() {
     }
     createUserWithEmailAndPassword(auth, signupEmail, signupPassword)
       .then((userCredential) => {
-        console.log("Usuário criado:", userCredential.user.uid);
         alert("Conta criada com sucesso! Faça login para continuar.");
         setIsLoginScreen(true);
         setSignupEmail("");
@@ -247,23 +238,17 @@ function App() {
 
   const handleCreateTicket = async (e) => {
     e.preventDefault();
-    console.log("Iniciando criação do chamado...");
-
     if (!newTicketNome.trim()) {
       alert("Insira o nome completo do solicitante.");
-      console.log("Criação abortada: campo de nome vazio.");
       return;
     }
     if (!isValidSolicitanteName(newTicketNome)) {
       alert("Por favor, insira um nome composto com as iniciais em maiúsculas.");
-      console.log("Criação abortada: nome inválido.");
       return;
     }
-
     const user = auth.currentUser;
     if (!user) {
       alert("Você precisa estar logado para criar um ticket.");
-      console.log("Criação abortada: usuário não logado.");
       return;
     }
 
@@ -275,7 +260,6 @@ function App() {
     const prazoFinalizacaoDate = addBusinessDays(dataDeAbertura, daysToAdd);
     const prazoFinalizacao = prazoFinalizacaoDate.toISOString();
 
-    // Upload dos anexos para o Storage
     let attachmentURLs = [];
     if (newTicketFiles.length > 0) {
       for (const file of newTicketFiles) {
@@ -304,6 +288,7 @@ function App() {
       prazoFinalizacao,
       status: "Aberto",
       dataResolucao: "",
+      dataResolucaoISO: "",
       sla: "",
       responsavel: "",
       comentarios: [],
@@ -311,16 +296,13 @@ function App() {
     };
 
     try {
-      console.log("Chamando setDoc...");
       await setDoc(doc(db, 'tickets', ticketId), newTicket);
-      console.log("Ticket salvo no Firestore com sucesso!");
       sendTicketUpdateEmail(newTicket, "Abertura de novo chamado");
     } catch (error) {
       console.error("Erro ao criar ticket no Firestore:", error);
-      alert("Falha ao criar o ticket. Verifique o console para detalhes.");
+      alert("Falha ao criar o ticket.");
     }
 
-    // Resetar campos do form
     setNewTicketNome("");
     setCargoDepartamento("");
     setDescricaoProblema("");
@@ -355,10 +337,7 @@ function App() {
       {!currentUser && (
         <div className="flex items-center justify-center">
           {isLoginScreen ? (
-            <form
-              onSubmit={handleLoginSubmit}
-              className="bg-white shadow p-4 rounded-2xl w-full max-w-md"
-            >
+            <form onSubmit={handleLoginSubmit} className="bg-white shadow p-4 rounded-2xl w-full max-w-md">
               <h2 className="text-xl font-bold mb-4 text-center">Faça seu login</h2>
               <div className="mb-2">
                 <label className="block font-semibold">E-mail:</label>
@@ -410,10 +389,7 @@ function App() {
               </p>
             </form>
           ) : (
-            <form
-              onSubmit={handleSignUp}
-              className="bg-white shadow p-4 rounded-2xl w-full max-w-md"
-            >
+            <form onSubmit={handleSignUp} className="bg-white shadow p-4 rounded-2xl w-full max-w-md">
               <h2 className="text-xl font-bold mb-4 text-center">Crie sua conta</h2>
               <div className="mb-2">
                 <label className="block font-semibold">E-mail:</label>
@@ -477,7 +453,8 @@ function App() {
                 className="px-3 py-1 rounded shadow"
                 style={{ backgroundColor: modoAdmin ? "#0E1428" : "#FF5E00", color: "white" }}
               >
-                {modoAdmin ? "Atuando como Admin" : "Atuando como Usuário Comum"}
+                {/* ALterar rótulo conforme solicitado */}
+                {modoAdmin ? "Alterar visão para Usuário" : "Alterar visão para Admin"}
               </button>
             </div>
           )}
@@ -535,9 +512,8 @@ function App() {
                   className="border rounded px-2 py-1"
                 >
                   <option value="">Atendente: Todos</option>
-                  {atendenteOptions.map((opt, idx) => (
-                    <option key={idx} value={opt}>{opt}</option>
-                  ))}
+                  <option value="Jonathan Kauer">Jonathan Kauer</option>
+                  <option value="Nayla Martins">Nayla Martins</option>
                 </select>
               </div>
             )}
@@ -628,7 +604,7 @@ function App() {
                   required
                   className="border rounded px-2 py-1 w-full"
                 >
-                  <option value="" disabled>Selecione</option>
+                  <option value="">Selecione</option>
                   {categoryOptions.map((option, idx) => (
                     <option key={idx} value={option}>{option}</option>
                   ))}
