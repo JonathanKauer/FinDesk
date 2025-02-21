@@ -13,8 +13,8 @@ import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { db, storage } from './firebase-config.js';
 
 import { StarRating } from './utils.js'; 
-// Se você estiver usando o componente de estrelas a partir de um utils.js. 
-// Caso não use, remova esse import.
+// Se você estiver usando o componente de estrelas a partir do utils.js 
+// (caso não use, remova esse import).
 
 const priorityOptions = [
   "Baixa (7 dias úteis)",
@@ -34,12 +34,11 @@ const TicketList = ({ currentUser, activeTab, onSendEmail, calculateSLA }) => {
   const [editComentario, setEditComentario] = useState("");
   const [editFiles, setEditFiles] = useState([]);
 
-  // Estados para avaliação
+  // Avaliação (Estrelas)
   const [showEvaluation, setShowEvaluation] = useState(false);
   const [ratingValue, setRatingValue] = useState(0);
   const [ticketToEvaluate, setTicketToEvaluate] = useState(null);
 
-  // Carrega os tickets do usuário logado
   useEffect(() => {
     if (!currentUser) return;
 
@@ -55,7 +54,7 @@ const TicketList = ({ currentUser, activeTab, onSendEmail, calculateSLA }) => {
           id: docSnap.id,
           ...docSnap.data()
         }));
-        // Filtra pela aba (aberto/concluído)
+        // Filtra pela aba (abertos/concluídos)
         const filtered = (activeTab === 'open')
           ? all.filter(tk => tk.status !== 'Concluído')
           : all.filter(tk => tk.status === 'Concluído');
@@ -70,7 +69,7 @@ const TicketList = ({ currentUser, activeTab, onSendEmail, calculateSLA }) => {
     return () => unsubscribe();
   }, [currentUser, activeTab]);
 
-  // ------------- REABERTURA -------------
+  // -------- REABRIR --------
   const handleReopenTicket = async (ticket) => {
     const reason = prompt("Descreva o motivo da reabertura:");
     if (!reason || !reason.trim()) {
@@ -102,7 +101,7 @@ const TicketList = ({ currentUser, activeTab, onSendEmail, calculateSLA }) => {
     }
   };
 
-  // ------------- AVALIAÇÃO (ESTRELAS) -------------
+  // -------- AVALIAR (ESTRELAS) --------
   const handleEvaluateTicket = (ticket) => {
     setTicketToEvaluate(ticket);
     setRatingValue(ticket.avaliacao || 0);
@@ -111,13 +110,14 @@ const TicketList = ({ currentUser, activeTab, onSendEmail, calculateSLA }) => {
 
   const saveEvaluation = async () => {
     if (!ticketToEvaluate) return;
-
     const updateData = {
       avaliacao: ratingValue
     };
     try {
       await updateDoc(doc(db, 'tickets', ticketToEvaluate.id), updateData);
-      if (onSendEmail) onSendEmail({ ...ticketToEvaluate, ...updateData }, "Chamado avaliado pelo usuário");
+      if (onSendEmail) {
+        onSendEmail({ ...ticketToEvaluate, ...updateData }, "Chamado avaliado pelo usuário");
+      }
     } catch (error) {
       console.error("Erro ao avaliar ticket:", error);
       alert("Falha ao avaliar o ticket.");
@@ -127,7 +127,7 @@ const TicketList = ({ currentUser, activeTab, onSendEmail, calculateSLA }) => {
     setRatingValue(0);
   };
 
-  // ------------- EDIÇÃO -------------
+  // -------- EDIÇÃO --------
   const startEditTicket = (ticket) => {
     setEditTicketId(ticket.id);
     setEditDescricao(ticket.descricaoProblema || "");
@@ -135,7 +135,6 @@ const TicketList = ({ currentUser, activeTab, onSendEmail, calculateSLA }) => {
     setEditComentario("");
     setEditFiles([]);
   };
-
   const cancelEditTicket = () => {
     setEditTicketId(null);
     setEditDescricao("");
@@ -146,8 +145,6 @@ const TicketList = ({ currentUser, activeTab, onSendEmail, calculateSLA }) => {
 
   const saveEditTicket = async (ticket) => {
     let newAttachments = ticket.attachments || [];
-
-    // Upload de novos anexos
     if (editFiles.length > 0) {
       for (const file of editFiles) {
         try {
@@ -189,16 +186,14 @@ const TicketList = ({ currentUser, activeTab, onSendEmail, calculateSLA }) => {
     }
   };
 
-  // Se estiver carregando
   if (loading) return <p>Carregando seus chamados...</p>;
-  // Se não houver tickets
   if (tickets.length === 0) return <p>Nenhum chamado encontrado.</p>;
 
   return (
     <div>
       <h2 className="text-xl font-bold mb-4">Meus Chamados</h2>
 
-      {/* Modal para Avaliação (Estrelas) */}
+      {/* Modal de Avaliação (Estrelas) */}
       {showEvaluation && ticketToEvaluate && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center">
           <div className="bg-white p-4 rounded">
@@ -228,9 +223,10 @@ const TicketList = ({ currentUser, activeTab, onSendEmail, calculateSLA }) => {
 
       {tickets.map(ticket => {
         const isConcluido = (ticket.status === "Concluído");
+        const isAvaliado = !!ticket.avaliacao; // Se tiver valor, está avaliado
 
         if (editTicketId === ticket.id) {
-          // ---------- MODO EDIÇÃO ----------
+          // -------- MODO EDIÇÃO --------
           return (
             <div key={ticket.id} className="border rounded p-2 mb-2 bg-white">
               <p><strong>Status:</strong> {ticket.status}</p>
@@ -288,30 +284,22 @@ const TicketList = ({ currentUser, activeTab, onSendEmail, calculateSLA }) => {
             </div>
           );
         } else {
-          // ---------- MODO VISUALIZAÇÃO (ORDEM SOLICITADA) ----------
+          // -------- VISUALIZAÇÃO COM A NOVA ORDEM --------
           return (
             <div key={ticket.id} className="border rounded p-2 mb-2 bg-white">
-              {/* 1. Descrição */}
+              {/* 1) Descrição */}
               <p><strong>Descrição:</strong> {ticket.descricaoProblema}</p>
 
-              {/* 2. Data de Abertura */}
+              {/* 2) Data de Abertura */}
               <p><strong>Data de Abertura:</strong> {ticket.dataDeAbertura}</p>
 
-              {/* 3. Prioridade */}
+              {/* 3) Prioridade */}
               <p><strong>Prioridade:</strong> {ticket.prioridade}</p>
 
-              {/* 4. Status */}
+              {/* 4) Status */}
               <p><strong>Status:</strong> {ticket.status}</p>
 
-              {/* Se houver data de encerramento e SLA, podemos exibir também, se quiser (opcional) */}
-              {ticket.dataResolucao && (
-                <p><strong>Data de Encerramento:</strong> {ticket.dataResolucao}</p>
-              )}
-              {ticket.sla && (
-                <p><strong>SLA:</strong> {ticket.sla}</p>
-              )}
-
-              {/* 5. Comentários */}
+              {/* 5) Comentários */}
               {ticket.comentarios && ticket.comentarios.length > 0 && (
                 <div>
                   <strong>Comentários:</strong>
@@ -325,7 +313,7 @@ const TicketList = ({ currentUser, activeTab, onSendEmail, calculateSLA }) => {
                 </div>
               )}
 
-              {/* 6. Anexos (link azul, sublinhado, fonte menor) */}
+              {/* 6) Anexos (azul, sublinhado, fonte menor) */}
               {ticket.attachments && ticket.attachments.length > 0 && (
                 <div>
                   <strong>Anexos:</strong>
@@ -350,21 +338,23 @@ const TicketList = ({ currentUser, activeTab, onSendEmail, calculateSLA }) => {
                 </div>
               )}
 
-              {/* Botões de ação (Reabrir, Avaliar, Editar) */}
+              {/* Botões de ação */}
               {isConcluido ? (
                 <div className="mt-2 flex gap-2">
-                  <button
-                    onClick={() => handleReopenTicket(ticket)}
-                    className="px-2 py-1 rounded bg-blue-500 text-white"
-                  >
-                    Reabrir Chamado
-                  </button>
-
-                  {/* Avaliação: se ticket.avaliacao existir, mostra estrelas em readOnly */}
+                  {/* Se já avaliado, não pode reabrir */}
+                  {!isAvaliado && (
+                    <button
+                      onClick={() => handleReopenTicket(ticket)}
+                      className="px-2 py-1 rounded bg-blue-500 text-white"
+                    >
+                      Reabrir Chamado
+                    </button>
+                  )}
+                  {/* Avaliação */}
                   {ticket.avaliacao ? (
                     <div>
                       <p className="inline-block mr-2">Chamado Avaliado:</p>
-                      <StarRating rating={ticket.avaliacao} setRating={()=>{}} readOnly={true} />
+                      <StarRating rating={ticket.avaliacao} setRating={() => {}} readOnly={true} />
                     </div>
                   ) : (
                     <button
