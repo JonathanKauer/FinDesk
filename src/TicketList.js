@@ -24,7 +24,7 @@ const TicketList = ({ currentUser, activeTab, onSendEmail, calculateSLA }) => {
   const [tickets, setTickets] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  // Estados para edição (usuário comum)
+  // Estados para edição do usuário
   const [editTicketId, setEditTicketId] = useState(null);
   const [editDescricao, setEditDescricao] = useState("");
   const [editPrioridade, setEditPrioridade] = useState("");
@@ -50,7 +50,6 @@ const TicketList = ({ currentUser, activeTab, onSendEmail, calculateSLA }) => {
           id: docSnap.id,
           ...docSnap.data()
         }));
-        // Filtrar pela aba: "open" = não concluídos; "closed" = concluídos
         const filtered = activeTab === 'open'
           ? all.filter(ticket => ticket.status !== 'Concluído')
           : all.filter(ticket => ticket.status === 'Concluído');
@@ -65,65 +64,9 @@ const TicketList = ({ currentUser, activeTab, onSendEmail, calculateSLA }) => {
     return () => unsubscribe();
   }, [currentUser, activeTab]);
 
-  // Reabertura: bloqueia se o ticket já foi avaliado
-  const handleReopenTicket = async (ticket) => {
-    if (ticket.avaliacao) {
-      alert("Este chamado já foi avaliado e não pode ser reaberto.");
-      return;
-    }
-    const reason = prompt("Descreva o motivo da reabertura:");
-    if (!reason || !reason.trim()) {
-      alert("É necessário informar o motivo para reabrir o chamado.");
-      return;
-    }
-    let newComentarios = ticket.comentarios || [];
-    newComentarios.push({
-      autor: ticket.nomeSolicitante || "Usuário",
-      texto: `**Reabertura**: ${reason}`,
-      createdAt: new Date().toISOString()
-    });
-    const updateData = {
-      status: "Aberto",
-      dataResolucao: "",
-      dataResolucaoISO: "",
-      sla: "",
-      comentarios: newComentarios
-    };
-    try {
-      await updateDoc(doc(db, 'tickets', ticket.id), updateData);
-      if (onSendEmail) onSendEmail({ ...ticket, ...updateData }, "Chamado reaberto");
-    } catch (error) {
-      console.error("Erro ao reabrir ticket:", error);
-      alert("Falha ao reabrir o ticket.");
-    }
-  };
-
-  // Avaliação via estrelas
-  const handleEvaluateTicket = (ticket) => {
-    setTicketToEvaluate(ticket);
-    setRatingValue(ticket.avaliacao || 0);
-    setShowEvaluation(true);
-  };
-
-  const saveEvaluation = async () => {
-    if (!ticketToEvaluate) return;
-    const updateData = {
-      avaliacao: ratingValue
-    };
-    try {
-      await updateDoc(doc(db, 'tickets', ticketToEvaluate.id), updateData);
-      if (onSendEmail) onSendEmail({ ...ticketToEvaluate, ...updateData }, "Chamado avaliado pelo usuário");
-    } catch (error) {
-      console.error("Erro ao avaliar ticket:", error);
-      alert("Falha ao avaliar o ticket.");
-    }
-    setShowEvaluation(false);
-    setTicketToEvaluate(null);
-    setRatingValue(0);
-  };
-
-  // Iniciar edição (usuário)
+  // Função de edição – adicionei um console.log para debug
   const startEditTicket = (ticket) => {
+    console.log("Iniciando edição para ticket id:", ticket.id);
     setEditTicketId(ticket.id);
     setEditDescricao(ticket.descricaoProblema || "");
     setEditPrioridade(ticket.prioridade || "");
@@ -177,6 +120,61 @@ const TicketList = ({ currentUser, activeTab, onSendEmail, calculateSLA }) => {
     }
   };
 
+  // Reabrir chamado – se já avaliado, não permite reabertura
+  const handleReopenTicket = async (ticket) => {
+    if (ticket.avaliacao) {
+      alert("Este chamado já foi avaliado e não pode ser reaberto.");
+      return;
+    }
+    const reason = prompt("Descreva o motivo da reabertura:");
+    if (!reason || !reason.trim()) {
+      alert("É necessário informar o motivo para reabrir o chamado.");
+      return;
+    }
+    let newComentarios = ticket.comentarios || [];
+    newComentarios.push({
+      autor: ticket.nomeSolicitante || "Usuário",
+      texto: `**Reabertura**: ${reason}`,
+      createdAt: new Date().toISOString()
+    });
+    const updateData = {
+      status: "Aberto",
+      dataResolucao: "",
+      dataResolucaoISO: "",
+      sla: "",
+      comentarios: newComentarios
+    };
+    try {
+      await updateDoc(doc(db, 'tickets', ticket.id), updateData);
+      if (onSendEmail) onSendEmail({ ...ticket, ...updateData }, "Chamado reaberto");
+    } catch (error) {
+      console.error("Erro ao reabrir ticket:", error);
+      alert("Falha ao reabrir o ticket.");
+    }
+  };
+
+  // Avaliação via estrelas
+  const handleEvaluateTicket = (ticket) => {
+    setTicketToEvaluate(ticket);
+    setRatingValue(ticket.avaliacao || 0);
+    setShowEvaluation(true);
+  };
+
+  const saveEvaluation = async () => {
+    if (!ticketToEvaluate) return;
+    const updateData = { avaliacao: ratingValue };
+    try {
+      await updateDoc(doc(db, 'tickets', ticketToEvaluate.id), updateData);
+      if (onSendEmail) onSendEmail({ ...ticketToEvaluate, ...updateData }, "Chamado avaliado pelo usuário");
+    } catch (error) {
+      console.error("Erro ao avaliar ticket:", error);
+      alert("Falha ao avaliar o ticket.");
+    }
+    setShowEvaluation(false);
+    setTicketToEvaluate(null);
+    setRatingValue(0);
+  };
+
   if (loading) return <p>Carregando seus chamados...</p>;
   if (tickets.length === 0) return <p>Nenhum chamado encontrado.</p>;
 
@@ -184,7 +182,6 @@ const TicketList = ({ currentUser, activeTab, onSendEmail, calculateSLA }) => {
     <div>
       <h2 className="text-xl font-bold mb-4">Meus Chamados</h2>
 
-      {/* Modal para Avaliação via Estrelas */}
       {showEvaluation && ticketToEvaluate && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center">
           <div className="bg-white p-4 rounded">
@@ -214,12 +211,11 @@ const TicketList = ({ currentUser, activeTab, onSendEmail, calculateSLA }) => {
 
       {tickets.map(ticket => (
         <div key={ticket.id} className="border rounded p-2 mb-2 bg-white">
-          {/* Ordem de exibição para o usuário */}
+          {/* Ordem para usuário: Descrição, Data de Abertura, Prioridade, Status, Comentários, Anexos */}
           <p><strong>Descrição:</strong> {ticket.descricaoProblema}</p>
           <p><strong>Data de Abertura:</strong> {ticket.dataDeAbertura}</p>
           <p><strong>Prioridade:</strong> {ticket.prioridade}</p>
           <p><strong>Status:</strong> {ticket.status}</p>
-
           {ticket.comentarios && ticket.comentarios.length > 0 && (
             <div>
               <strong>Comentários:</strong>
@@ -232,7 +228,6 @@ const TicketList = ({ currentUser, activeTab, onSendEmail, calculateSLA }) => {
               </ul>
             </div>
           )}
-
           {ticket.attachments && ticket.attachments.length > 0 && (
             <div>
               <strong>Anexos:</strong>
@@ -256,7 +251,6 @@ const TicketList = ({ currentUser, activeTab, onSendEmail, calculateSLA }) => {
               </ul>
             </div>
           )}
-
           {ticket.status === 'Concluído' ? (
             <div className="mt-2 flex gap-2">
               {!ticket.avaliacao && (
