@@ -1,7 +1,7 @@
 // src/App.js
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Helmet } from "react-helmet";
+import { Helmet } from 'react-helmet';
 import { collection, doc, setDoc } from 'firebase/firestore';
 import {
   onAuthStateChanged,
@@ -9,7 +9,7 @@ import {
   createUserWithEmailAndPassword,
   signOut,
   sendPasswordResetEmail
-} from "firebase/auth";
+} from 'firebase/auth';
 import { db, auth, storage } from './firebase-config.js';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 
@@ -311,6 +311,92 @@ function App() {
     setNewTicketFiles(Array.from(e.target.files));
   };
 
+  if (!currentUser) {
+    return (
+      <div className="flex items-center justify-center">
+        {isLoginScreen ? (
+          <form onSubmit={handleLoginSubmit} className="bg-white shadow p-4 rounded-2xl w-full max-w-md">
+            <h2 className="text-xl font-bold mb-4 text-center">Faça seu login</h2>
+            <div className="mb-2">
+              <label className="block font-semibold">E-mail:</label>
+              <input
+                type="email"
+                value={loginEmail}
+                onChange={(e) => setLoginEmail(e.target.value)}
+                required
+                className="border rounded px-2 py-1 w-full"
+                placeholder="Digite seu e-mail"
+              />
+            </div>
+            <div className="mb-2">
+              <label className="block font-semibold">Senha:</label>
+              <input
+                type="password"
+                value={loginPassword}
+                onChange={(e) => setLoginPassword(e.target.value)}
+                required
+                className="border rounded px-2 py-1 w-full"
+              />
+            </div>
+            <div className="flex justify-between mt-4">
+              <button type="submit" className="px-3 py-1 rounded shadow" style={{ backgroundColor: "#0E1428", color: "white" }}>
+                Entrar
+              </button>
+              <button
+                type="button"
+                onClick={handleResetPassword}
+                className="px-3 py-1 rounded shadow"
+                style={{ backgroundColor: "#FF5E00", color: "white" }}
+              >
+                Redefinir senha
+              </button>
+            </div>
+            <p className="mt-4 text-center">
+              Não tem conta?{" "}
+              <button type="button" onClick={() => setIsLoginScreen(false)} className="text-blue-500">
+                Cadastre-se
+              </button>
+            </p>
+          </form>
+        ) : (
+          <form onSubmit={handleSignUp} className="bg-white shadow p-4 rounded-2xl w-full max-w-md">
+            <h2 className="text-xl font-bold mb-4 text-center">Crie sua conta</h2>
+            <div className="mb-2">
+              <label className="block font-semibold">E-mail:</label>
+              <input
+                type="email"
+                value={signupEmail}
+                onChange={(e) => setSignupEmail(e.target.value)}
+                required
+                className="border rounded px-2 py-1 w-full"
+                placeholder="Digite seu e-mail (@guiainvest.com.br)"
+              />
+            </div>
+            <div className="mb-2">
+              <label className="block font-semibold">Senha:</label>
+              <input
+                type="password"
+                value={signupPassword}
+                onChange={(e) => setSignupPassword(e.target.value)}
+                required
+                className="border rounded px-2 py-1 w-full"
+              />
+            </div>
+            <button type="submit" className="w-full px-3 py-1 rounded shadow" style={{ backgroundColor: "#0E1428", color: "white" }}>
+              Criar Conta
+            </button>
+            <p className="mt-4 text-center">
+              Já tem conta?{" "}
+              <button type="button" onClick={() => setIsLoginScreen(true)} className="text-blue-500">
+                Faça login
+              </button>
+            </p>
+          </form>
+        )}
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gray-100 relative p-4" style={{ color: "#0E1428" }}>
       <Helmet>
@@ -329,308 +415,194 @@ function App() {
         </motion.h1>
       </div>
 
-      {!currentUser && (
-        <div className="flex items-center justify-center">
-          {isLoginScreen ? (
-            <form onSubmit={handleLoginSubmit} className="bg-white shadow p-4 rounded-2xl w-full max-w-md">
-              <h2 className="text-xl font-bold mb-4 text-center">Faça seu login</h2>
-              <div className="mb-2">
-                <label className="block font-semibold">E-mail:</label>
-                <input
-                  type="email"
-                  value={loginEmail}
-                  onChange={(e) => setLoginEmail(e.target.value)}
-                  required
-                  className="border rounded px-2 py-1 w-full"
-                  placeholder="Digite seu e-mail"
-                />
-              </div>
-              <div className="mb-2">
-                <label className="block font-semibold">Senha:</label>
-                <input
-                  type="password"
-                  value={loginPassword}
-                  onChange={(e) => setLoginPassword(e.target.value)}
-                  required
-                  className="border rounded px-2 py-1 w-full"
-                />
-              </div>
-              <div className="flex justify-between mt-4">
-                <button
-                  type="submit"
-                  className="px-3 py-1 rounded shadow"
-                  style={{ backgroundColor: "#0E1428", color: "white" }}
-                >
-                  Entrar
-                </button>
-                <button
-                  type="button"
-                  onClick={handleResetPassword}
-                  className="px-3 py-1 rounded shadow"
-                  style={{ backgroundColor: "#FF5E00", color: "white" }}
-                >
-                  Redefinir senha
-                </button>
-              </div>
-              <p className="mt-4 text-center">
-                Não tem conta?{" "}
-                <button
-                  type="button"
-                  onClick={() => setIsLoginScreen(false)}
-                  className="text-blue-500"
-                >
-                  Cadastre-se
-                </button>
-              </p>
-            </form>
-          ) : (
-            <form onSubmit={handleSignUp} className="bg-white shadow p-4 rounded-2xl w-full max-w-md">
-              <h2 className="text-xl font-bold mb-4 text-center">Crie sua conta</h2>
-              <div className="mb-2">
-                <label className="block font-semibold">E-mail:</label>
-                <input
-                  type="email"
-                  value={signupEmail}
-                  onChange={(e) => setSignupEmail(e.target.value)}
-                  required
-                  className="border rounded px-2 py-1 w-full"
-                  placeholder="Digite seu e-mail (@guiainvest.com.br)"
-                />
-              </div>
-              <div className="mb-2">
-                <label className="block font-semibold">Senha:</label>
-                <input
-                  type="password"
-                  value={signupPassword}
-                  onChange={(e) => setSignupPassword(e.target.value)}
-                  required
-                  className="border rounded px-2 py-1 w-full"
-                />
-              </div>
-              <button
-                type="submit"
-                className="w-full px-3 py-1 rounded shadow"
-                style={{ backgroundColor: "#0E1428", color: "white" }}
-              >
-                Criar Conta
-              </button>
-              <p className="mt-4 text-center">
-                Já tem conta?{" "}
-                <button
-                  type="button"
-                  onClick={() => setIsLoginScreen(true)}
-                  className="text-blue-500"
-                >
-                  Faça login
-                </button>
-              </p>
-            </form>
-          )}
+      {currentUser.isAdmin && (
+        <div className="flex justify-end mb-4">
+          <button
+            onClick={() => setModoAdmin(!modoAdmin)}
+            className="px-3 py-1 rounded shadow"
+            style={{ backgroundColor: modoAdmin ? "#0E1428" : "#FF5E00", color: "white" }}
+          >
+            {modoAdmin ? "Alterar visão para Usuário" : "Alterar visão para Admin"}
+          </button>
         </div>
       )}
 
-      {currentUser && (
-        <>
-          <div className="absolute top-4 right-4">
-            <button
-              onClick={handleLogout}
-              className="px-3 py-1 rounded shadow"
-              style={{ backgroundColor: "#FF5E00", color: "white" }}
+      <div className="flex flex-col items-center mb-4">
+        <div className="flex gap-4 mb-4">
+          <button
+            onClick={() => setActiveTab("open")}
+            className="px-3 py-1 rounded"
+            style={
+              activeTab === "open"
+                ? { backgroundColor: "#0E1428", color: "white" }
+                : { backgroundColor: "#f2f2f2", color: "#0E1428", border: "1px solid #0E1428" }
+            }
+          >
+            Abertos e em andamento
+          </button>
+          <button
+            onClick={() => setActiveTab("closed")}
+            className="px-3 py-1 rounded"
+            style={
+              activeTab === "closed"
+                ? { backgroundColor: "#0E1428", color: "white" }
+                : { backgroundColor: "#f2f2f2", color: "#0E1428", border: "1px solid #0E1428" }
+            }
+          >
+            Concluídos
+          </button>
+        </div>
+      </div>
+
+      {(!currentUser.isAdmin || (currentUser.isAdmin && !modoAdmin)) && (
+        <div className="mb-4 flex justify-center">
+          <button
+            onClick={() => setShowNewTicketForm(true)}
+            className="px-3 py-1 rounded shadow"
+            style={{ backgroundColor: "#FF5E00", color: "white" }}
+          >
+            Criar Novo Chamado
+          </button>
+        </div>
+      )}
+
+      {showNewTicketForm && (
+        <motion.form
+          className="bg-white shadow p-4 rounded-2xl w-full max-w-lg mx-auto mb-4"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3 }}
+          onSubmit={handleCreateTicket}
+        >
+          <h2 className="text-xl font-bold mb-4">Novo Chamado FinDesk</h2>
+          <div className="mb-2">
+            <label className="block font-semibold">Nome Completo do Solicitante:</label>
+            <input
+              type="text"
+              value={newTicketNome}
+              onChange={(e) => setNewTicketNome(e.target.value)}
+              required
+              className="border rounded px-2 py-1 w-full"
+              placeholder="Ex.: Jonathan Kauer"
+            />
+          </div>
+          <div className="mb-2">
+            <label className="block font-semibold">Cargo/Departamento:</label>
+            <select
+              value={cargoDepartamento}
+              onChange={(e) => {
+                if (e.target.value === "+Novo") {
+                  const novoCargo = prompt("Digite o novo cargo/departamento:");
+                  if (novoCargo) {
+                    setCargoOptions([...cargoOptions.slice(0, -1), novoCargo, "+Novo"]);
+                    setCargoDepartamento(novoCargo);
+                  }
+                } else {
+                  setCargoDepartamento(e.target.value);
+                }
+              }}
+              required
+              className="border rounded px-2 py-1 w-full"
             >
-              Sair
+              <option value="">Selecione</option>
+              {cargoOptions.map((option, idx) => (
+                <option key={idx} value={option}>{option}</option>
+              ))}
+            </select>
+          </div>
+          <div className="mb-2">
+            <label className="block font-semibold">Descrição do Problema:</label>
+            <textarea
+              value={descricaoProblema}
+              onChange={(e) => setDescricaoProblema(e.target.value)}
+              required
+              className="border rounded px-2 py-1 w-full"
+              rows="4"
+            />
+          </div>
+          <div className="mb-2">
+            <label className="block font-semibold">Categoria:</label>
+            <select
+              value={categoria}
+              onChange={(e) => {
+                if (e.target.value === "+Novo") {
+                  const novaCategoria = prompt("Digite a nova categoria:");
+                  if (novaCategoria) {
+                    const filtered = categoryOptions.filter(opt => opt !== "+Novo");
+                    setCategoryOptions([...filtered, novaCategoria, "+Novo"]);
+                    setCategoria(novaCategoria);
+                  }
+                } else {
+                  setCategoria(e.target.value);
+                }
+              }}
+              required
+              className="border rounded px-2 py-1 w-full"
+            >
+              <option value="">Selecione</option>
+              {categoryOptions.map((option, idx) => (
+                <option key={idx} value={option}>{option}</option>
+              ))}
+            </select>
+          </div>
+          <div className="mb-2">
+            <label className="block font-semibold">Prioridade:</label>
+            <select
+              name="prioridade"
+              value={prioridade}
+              onChange={(e) => setPrioridade(e.target.value)}
+              required
+              className="border rounded px-2 py-1 w-full"
+            >
+              <option value="">Selecione</option>
+              {priorityOptions.map((option, idx) => (
+                <option key={idx} value={option}>{option}</option>
+              ))}
+            </select>
+          </div>
+          <div className="mb-2">
+            <label className="block font-semibold">Anexar documentos/evidências:</label>
+            <input type="file" multiple onChange={handleTicketFileChange} className="w-full" />
+          </div>
+          <div className="flex justify-end gap-2 mt-4">
+            <button
+              type="button"
+              onClick={() => setShowNewTicketForm(false)}
+              className="px-3 py-1 bg-gray-300 rounded"
+            >
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              className="px-3 py-1 rounded"
+              style={{ backgroundColor: "#0E1428", color: "white" }}
+            >
+              Criar Chamado
             </button>
           </div>
-
-          {currentUser.isAdmin && (
-            <div className="flex justify-end mb-4">
-              <button
-                onClick={() => setModoAdmin(!modoAdmin)}
-                className="px-3 py-1 rounded shadow"
-                style={{ backgroundColor: modoAdmin ? "#0E1428" : "#FF5E00", color: "white" }}
-              >
-                {modoAdmin ? "Alterar visão para Usuário" : "Alterar visão para Admin"}
-              </button>
-            </div>
-          )}
-
-          <div className="flex flex-col items-center mb-4">
-            <div className="flex gap-4 mb-4">
-              <button
-                onClick={() => setActiveTab("open")}
-                className="px-3 py-1 rounded"
-                style={
-                  activeTab === "open"
-                    ? { backgroundColor: "#0E1428", color: "white" }
-                    : { backgroundColor: "#f2f2f2", color: "#0E1428", border: "1px solid #0E1428" }
-                }
-              >
-                Abertos e em andamento
-              </button>
-              <button
-                onClick={() => setActiveTab("closed")}
-                className="px-3 py-1 rounded"
-                style={
-                  activeTab === "closed"
-                    ? { backgroundColor: "#0E1428", color: "white" }
-                    : { backgroundColor: "#f2f2f2", color: "#0E1428", border: "1px solid #0E1428" }
-                }
-              >
-                Concluídos
-              </button>
-            </div>
-          </div>
-
-          {(!currentUser.isAdmin || (currentUser.isAdmin && !modoAdmin)) && (
-            <div className="mb-4 flex justify-center">
-              <button
-                onClick={() => setShowNewTicketForm(true)}
-                className="px-3 py-1 rounded shadow"
-                style={{ backgroundColor: "#FF5E00", color: "white" }}
-              >
-                Criar Novo Chamado
-              </button>
-            </div>
-          )}
-
-          {showNewTicketForm && (
-            <motion.form
-              className="bg-white shadow p-4 rounded-2xl w-full max-w-lg mx-auto mb-4"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.3 }}
-              onSubmit={handleCreateTicket}
-            >
-              <h2 className="text-xl font-bold mb-4">Novo Chamado FinDesk</h2>
-              <div className="mb-2">
-                <label className="block font-semibold">Nome Completo do Solicitante:</label>
-                <input
-                  type="text"
-                  value={newTicketNome}
-                  onChange={(e) => setNewTicketNome(e.target.value)}
-                  required
-                  className="border rounded px-2 py-1 w-full"
-                  placeholder="Ex.: Jonathan Kauer"
-                />
-              </div>
-              <div className="mb-2">
-                <label className="block font-semibold">Cargo/Departamento:</label>
-                <select
-                  value={cargoDepartamento}
-                  onChange={(e) => {
-                    if (e.target.value === "+Novo") {
-                      const novoCargo = prompt("Digite o novo cargo/departamento:");
-                      if (novoCargo) {
-                        setCargoOptions([...cargoOptions.slice(0, -1), novoCargo, "+Novo"]);
-                        setCargoDepartamento(novoCargo);
-                      }
-                    } else {
-                      setCargoDepartamento(e.target.value);
-                    }
-                  }}
-                  required
-                  className="border rounded px-2 py-1 w-full"
-                >
-                  <option value="">Selecione</option>
-                  {cargoOptions.map((option, idx) => (
-                    <option key={idx} value={option}>{option}</option>
-                  ))}
-                </select>
-              </div>
-              <div className="mb-2">
-                <label className="block font-semibold">Descrição do Problema:</label>
-                <textarea
-                  value={descricaoProblema}
-                  onChange={(e) => setDescricaoProblema(e.target.value)}
-                  required
-                  className="border rounded px-2 py-1 w-full"
-                  rows="4"
-                />
-              </div>
-              <div className="mb-2">
-                <label className="block font-semibold">Categoria:</label>
-                <select
-                  value={categoria}
-                  onChange={(e) => {
-                    if (e.target.value === "+Novo") {
-                      const novaCategoria = prompt("Digite a nova categoria:");
-                      if (novaCategoria) {
-                        const filtered = categoryOptions.filter(opt => opt !== "+Novo");
-                        setCategoryOptions([...filtered, novaCategoria, "+Novo"]);
-                        setCategoria(novaCategoria);
-                      }
-                    } else {
-                      setCategoria(e.target.value);
-                    }
-                  }}
-                  required
-                  className="border rounded px-2 py-1 w-full"
-                >
-                  <option value="">Selecione</option>
-                  {categoryOptions.map((option, idx) => (
-                    <option key={idx} value={option}>{option}</option>
-                  ))}
-                </select>
-              </div>
-              <div className="mb-2">
-                <label className="block font-semibold">Prioridade:</label>
-                <select
-                  name="prioridade"
-                  value={prioridade}
-                  onChange={(e) => setPrioridade(e.target.value)}
-                  required
-                  className="border rounded px-2 py-1 w-full"
-                >
-                  <option value="">Selecione</option>
-                  {priorityOptions.map((option, idx) => (
-                    <option key={idx} value={option}>{option}</option>
-                  ))}
-                </select>
-              </div>
-              <div className="mb-2">
-                <label className="block font-semibold">Anexar documentos/evidências:</label>
-                <input type="file" multiple onChange={handleTicketFileChange} className="w-full" />
-              </div>
-              <div className="flex justify-end gap-2 mt-4">
-                <button
-                  type="button"
-                  onClick={() => setShowNewTicketForm(false)}
-                  className="px-3 py-1 bg-gray-300 rounded"
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="submit"
-                  className="px-3 py-1 rounded"
-                  style={{ backgroundColor: "#0E1428", color: "white" }}
-                >
-                  Criar Chamado
-                </button>
-              </div>
-            </motion.form>
-          )}
-
-          <div className="mt-8 w-full max-w-5xl mx-auto">
-            {currentUser.isAdmin && modoAdmin ? (
-              <TicketListAdmin
-                activeTab={activeTab}
-                filterPriority={adminFilterPriority}
-                filterCategory={adminFilterCategory}
-                filterAtendente={adminFilterAtendente}
-                onSendEmail={sendTicketUpdateEmail}
-                calculateSLA={calculateSLA}
-                currentUser={currentUser}
-              />
-            ) : (
-              <TicketList
-                activeTab={activeTab}
-                currentUser={currentUser}
-                onSendEmail={sendTicketUpdateEmail}
-                calculateSLA={calculateSLA}
-              />
-            )}
-          </div>
-        </>
+        </motion.form>
       )}
+
+      <div className="mt-8 w-full max-w-5xl mx-auto">
+        {currentUser.isAdmin && modoAdmin ? (
+          <TicketListAdmin
+            activeTab={activeTab}
+            filterPriority={adminFilterPriority}
+            filterCategory={adminFilterCategory}
+            filterAtendente={adminFilterAtendente}
+            onSendEmail={sendTicketUpdateEmail}
+            calculateSLA={calculateSLA}
+            currentUser={currentUser}
+          />
+        ) : (
+          <TicketList
+            activeTab={activeTab}
+            currentUser={currentUser}
+            onSendEmail={sendTicketUpdateEmail}
+            calculateSLA={calculateSLA}
+          />
+        )}
+      </div>
     </div>
   );
 }
