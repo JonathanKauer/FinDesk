@@ -27,13 +27,10 @@ const TicketListAdmin = ({
   const [editTicketId, setEditTicketId] = useState(null);
   const [editStatus, setEditStatus] = useState("");
   const [editResponsavel, setEditResponsavel] = useState("");
-  const [editDescricao, setEditDescricao] = useState("");
-  const [editPrioridade, setEditPrioridade] = useState("");
   const [editComentario, setEditComentario] = useState("");
   const [editFiles, setEditFiles] = useState([]);
 
   useEffect(() => {
-    // Carrega todos os tickets em ordem descendente de data
     const q = query(
       collection(db, 'tickets'),
       orderBy('dataDeAberturaISO', 'desc')
@@ -46,7 +43,6 @@ const TicketListAdmin = ({
           ...docSnap.data()
         }));
 
-        // Filtros
         if (filterPriority) {
           list = list.filter((ticket) => ticket.prioridade === filterPriority);
         }
@@ -57,10 +53,11 @@ const TicketListAdmin = ({
           list = list.filter((ticket) => ticket.responsavel === filterAtendente);
         }
 
-        // Filtro por status (aba "open" vs "closed")
         if (activeTab === 'open') {
+          // Exibe apenas tickets não concluídos
           list = list.filter((ticket) => ticket.status !== 'Concluído');
         } else {
+          // Exibe apenas tickets concluídos
           list = list.filter((ticket) => ticket.status === 'Concluído');
         }
 
@@ -75,7 +72,6 @@ const TicketListAdmin = ({
     return () => unsubscribe();
   }, [activeTab, filterPriority, filterCategory, filterAtendente]);
 
-  // Excluir ticket
   const handleDeleteTicket = async (ticketId) => {
     try {
       await deleteDoc(doc(db, 'tickets', ticketId));
@@ -86,36 +82,31 @@ const TicketListAdmin = ({
     }
   };
 
-  // Preparar edição (carrega dados do ticket no form)
+  // Iniciar edição
   const startEditTicket = (ticket) => {
     setEditTicketId(ticket.id);
     setEditStatus(ticket.status || "");
     setEditResponsavel(ticket.responsavel || "");
-    setEditDescricao(ticket.descricaoProblema || "");
-    setEditPrioridade(ticket.prioridade || "");
     setEditComentario("");
     setEditFiles([]);
   };
 
-  // Cancelar edição
   const cancelEditTicket = () => {
     setEditTicketId(null);
     setEditStatus("");
     setEditResponsavel("");
-    setEditDescricao("");
-    setEditPrioridade("");
     setEditComentario("");
     setEditFiles([]);
   };
 
-  // Salvar edição
+  // Quando admin salva edição
   const saveEditTicket = async (ticket) => {
-    // Subir arquivos novos, caso haja
     let newAttachments = ticket.attachments || [];
+
+    // Upload de novos arquivos
     if (editFiles.length > 0) {
       for (const file of editFiles) {
         try {
-          // Sobe no Storage, usando a pasta: tickets/<ticketId>/<fileName>
           const storageRef = ref(storage, `tickets/${ticket.id}/${file.name}`);
           await uploadBytes(storageRef, file);
           const downloadURL = await getDownloadURL(storageRef);
@@ -126,30 +117,49 @@ const TicketListAdmin = ({
       }
     }
 
-    // Adicionar comentário, se houver
     let newComentarios = ticket.comentarios || [];
     if (editComentario.trim()) {
-      newComentarios.push(editComentario);
+      // Armazena também o nome do admin e a data/hora
+      newComentarios.push({
+        autor: "Admin", // Você pode colocar o e-mail do admin aqui, se preferir
+        texto: editComentario,
+        createdAt: new Date().toISOString()
+      });
     }
 
-    // Monta objeto de atualização
+    // Se o admin definir Concluído, vamos preencher dataResolucao e sla
     const updateData = {
-      status: editStatus,
-      responsavel: editResponsavel,
-      descricaoProblema: editDescricao,
-      prioridade: editPrioridade,
       attachments: newAttachments,
-      comentarios: newComentarios
+      comentarios: newComentarios,
+      status: editStatus,
+      responsavel: editResponsavel
     };
+
+    // Se o status for "Concluído", preencher dataResolucaoISO, dataResolucao e sla
+    if (editStatus === "Concluído") {
+      const now = new Date();
+      const isoNow = now.toISOString();
+      updateData.dataResolucaoISO = isoNow;
+      updateData.dataResolucao = now.toLocaleString();
+      // Calcula SLA com base na dataDeAberturaISO (já existente no ticket)
+      if (ticket.dataDeAberturaISO) {
+        const slaValue = calculateSLA(ticket.dataDeAberturaISO, isoNow);
+        updateData.sla = slaValue;
+      }
+    } else {
+      // Caso o admin volte o status para Aberto/Em Andamento, zera dataResolucao e sla
+      updateData.dataResolucaoISO = "";
+      updateData.dataResolucao = "";
+      updateData.sla = "";
+    }
 
     try {
       await updateDoc(doc(db, 'tickets', ticket.id), updateData);
       console.log('Ticket atualizado:', ticket.id);
 
-      // Dispara e-mail de notificação
-      if (onSendEmail) onSendEmail({ ...ticket, ...updateData }, 'Ticket atualizado pelo admin');
-
-      // Fecha a edição
+      if (onSendEmail) {
+        onSendEmail({ ...ticket, ...updateData }, 'Ticket atualizado pelo admin');
+      }
       cancelEditTicket();
     } catch (error) {
       console.error('Erro ao atualizar ticket:', error);
@@ -166,7 +176,7 @@ const TicketListAdmin = ({
       {tickets.map((ticket) => (
         <div key={ticket.id} className="border rounded p-2 mb-2 bg-white">
           {editTicketId === ticket.id ? (
-            // Formulário de edição
+            /* -------------- FORMULÁRIO DE EDIÇÃO PARA ADMIN -------------- */
             <div>
               <p><strong>ID:</strong> {ticket.id}</p>
 
@@ -181,35 +191,19 @@ const TicketListAdmin = ({
                 <option value="Concluído">Concluído</option>
               </select>
 
-              <label className="block font-semibold mt-2">Nome do Atendente:</label>
+              <label className="block font-semibold mt-2">Responsável (Atendente):</label>
               <select
                 value={editResponsavel}
                 onChange={(e) => setEditResponsavel(e.target.value)}
                 className="border px-2 py-1 rounded w-full"
               >
-                <option value="">Selecione</option>
+                <option value="">Não definido</option>
                 <option value="Jonathan Kauer">Jonathan Kauer</option>
                 <option value="Nayla Martins">Nayla Martins</option>
               </select>
 
-              <label className="block font-semibold mt-2">Prioridade:</label>
-              <input
-                type="text"
-                className="border px-2 py-1 rounded w-full"
-                value={editPrioridade}
-                onChange={(e) => setEditPrioridade(e.target.value)}
-              />
-
-              <label className="block font-semibold mt-2">Descrição do Problema:</label>
-              <textarea
-                className="border px-2 py-1 rounded w-full"
-                rows={3}
-                value={editDescricao}
-                onChange={(e) => setEditDescricao(e.target.value)}
-              />
-
               {/* Comentário adicional */}
-              <label className="block font-semibold mt-2">Adicionar Comentário:</label>
+              <label className="block font-semibold mt-2">Adicionar Comentário (Admin):</label>
               <textarea
                 className="border px-2 py-1 rounded w-full"
                 rows={2}
@@ -242,22 +236,30 @@ const TicketListAdmin = ({
               </div>
             </div>
           ) : (
-            // Visualização normal
+            /* -------------- VISUALIZAÇÃO NORMAL (LEITURA) -------------- */
             <div>
               <p><strong>ID:</strong> {ticket.id}</p>
               <p><strong>Solicitante:</strong> {ticket.nomeSolicitante}</p>
               <p><strong>Status:</strong> {ticket.status}</p>
               <p><strong>Responsável (Atendente):</strong> {ticket.responsavel || "Não definido"}</p>
+              {/* Admin NÃO edita Prioridade e Descrição, mas as vê: */}
               <p><strong>Prioridade:</strong> {ticket.prioridade}</p>
               <p><strong>Data de Abertura:</strong> {ticket.dataDeAbertura}</p>
-              {ticket.status === "Concluído" && ticket.dataDeAberturaISO && ticket.dataResolucaoISO && (
-                <p><strong>SLA:</strong> {calculateSLA(ticket.dataDeAberturaISO, ticket.dataResolucaoISO)}</p>
+
+              {/* Se já estiver concluído e existir dataResolucao, exibe */}
+              {ticket.status === "Concluído" && ticket.dataResolucao && (
+                <p><strong>Data de Encerramento:</strong> {ticket.dataResolucao}</p>
               )}
+              {/* SLA */}
+              {ticket.status === "Concluído" && ticket.sla && (
+                <p><strong>SLA:</strong> {ticket.sla}</p>
+              )}
+
               <p><strong>Descrição:</strong> {ticket.descricaoProblema}</p>
               <p><strong>Categoria:</strong> {ticket.categoria}</p>
               <p><strong>Cargo/Departamento:</strong> {ticket.cargoDepartamento}</p>
 
-              {/* Exibição dos anexos */}
+              {/* Anexos */}
               {ticket.attachments && ticket.attachments.length > 0 && (
                 <div>
                   <strong>Anexos:</strong>
@@ -273,13 +275,15 @@ const TicketListAdmin = ({
                 </div>
               )}
 
-              {/* Exibição de comentários */}
+              {/* Comentários: agora armazenam {autor, texto, createdAt} */}
               {ticket.comentarios && ticket.comentarios.length > 0 && (
                 <div>
                   <strong>Comentários:</strong>
-                  <ul>
+                  <ul style={{ fontSize: '0.9rem' }}>
                     {ticket.comentarios.map((com, i) => (
-                      <li key={i} className="ml-4 list-disc">{com}</li>
+                      <li key={i} className="ml-4 list-disc">
+                        <strong>{com.autor}:</strong> {com.texto}
+                      </li>
                     ))}
                   </ul>
                 </div>
