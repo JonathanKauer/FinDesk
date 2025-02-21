@@ -12,9 +12,11 @@ import {
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { db, storage } from './firebase-config.js';
 
-import { StarRating } from './utils.js'; 
-// Se você estiver usando o componente de estrelas a partir do utils.js 
-// (caso não use, remova esse import).
+// ReactQuill
+import ReactQuill from 'react-quill';
+import 'react-quill/dist/quill.snow.css';
+
+import { StarRating } from './utils.js';
 
 const priorityOptions = [
   "Baixa (7 dias úteis)",
@@ -27,21 +29,24 @@ const TicketList = ({ currentUser, activeTab, onSendEmail, calculateSLA }) => {
   const [tickets, setTickets] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  // Estados para edição
+  // Edição do ticket
   const [editTicketId, setEditTicketId] = useState(null);
-  const [editDescricao, setEditDescricao] = useState("");
+
+  // Rich text para descrição
+  const [editDescricaoHTML, setEditDescricaoHTML] = useState("");
+  // Rich text para comentário
+  const [editComentarioHTML, setEditComentarioHTML] = useState("");
+
   const [editPrioridade, setEditPrioridade] = useState("");
-  const [editComentario, setEditComentario] = useState("");
   const [editFiles, setEditFiles] = useState([]);
 
-  // Avaliação (Estrelas)
+  // Avaliação
   const [showEvaluation, setShowEvaluation] = useState(false);
   const [ratingValue, setRatingValue] = useState(0);
   const [ticketToEvaluate, setTicketToEvaluate] = useState(null);
 
   useEffect(() => {
     if (!currentUser) return;
-
     const q = query(
       collection(db, 'tickets'),
       where('userId', '==', currentUser.uid),
@@ -54,7 +59,7 @@ const TicketList = ({ currentUser, activeTab, onSendEmail, calculateSLA }) => {
           id: docSnap.id,
           ...docSnap.data()
         }));
-        // Filtra pela aba (abertos/concluídos)
+        // Filtro de status (open vs closed)
         const filtered = (activeTab === 'open')
           ? all.filter(tk => tk.status !== 'Concluído')
           : all.filter(tk => tk.status === 'Concluído');
@@ -69,21 +74,24 @@ const TicketList = ({ currentUser, activeTab, onSendEmail, calculateSLA }) => {
     return () => unsubscribe();
   }, [currentUser, activeTab]);
 
-  // -------- REABRIR --------
+  // Reabrir Chamado (bloqueado se já foi avaliado)
   const handleReopenTicket = async (ticket) => {
+    if (ticket.avaliacao) {
+      alert("Este chamado já foi avaliado e não pode mais ser reaberto.");
+      return;
+    }
     const reason = prompt("Descreva o motivo da reabertura:");
     if (!reason || !reason.trim()) {
       alert("É necessário informar o motivo para reabrir o chamado.");
       return;
     }
-
     let newComentarios = ticket.comentarios || [];
     newComentarios.push({
       autor: ticket.nomeSolicitante || "Usuário",
+      // Se quiser formatar esse “reason” também, precisaria de um Quill só pra reabertura.
       texto: `**Reabertura**: ${reason}`,
       createdAt: new Date().toISOString()
     });
-
     const updateData = {
       status: "Aberto",
       dataResolucao: "",
@@ -91,7 +99,6 @@ const TicketList = ({ currentUser, activeTab, onSendEmail, calculateSLA }) => {
       sla: "",
       comentarios: newComentarios
     };
-
     try {
       await updateDoc(doc(db, 'tickets', ticket.id), updateData);
       if (onSendEmail) onSendEmail({ ...ticket, ...updateData }, "Chamado reaberto");
@@ -101,7 +108,7 @@ const TicketList = ({ currentUser, activeTab, onSendEmail, calculateSLA }) => {
     }
   };
 
-  // -------- AVALIAR (ESTRELAS) --------
+  // Avaliar Chamado (Estrelas)
   const handleEvaluateTicket = (ticket) => {
     setTicketToEvaluate(ticket);
     setRatingValue(ticket.avaliacao || 0);
@@ -127,22 +134,25 @@ const TicketList = ({ currentUser, activeTab, onSendEmail, calculateSLA }) => {
     setRatingValue(0);
   };
 
-  // -------- EDIÇÃO --------
+  // Iniciar Edição
   const startEditTicket = (ticket) => {
     setEditTicketId(ticket.id);
-    setEditDescricao(ticket.descricaoProblema || "");
+    setEditDescricaoHTML(ticket.descricaoProblema || "");
     setEditPrioridade(ticket.prioridade || "");
-    setEditComentario("");
-    setEditFiles([]);
-  };
-  const cancelEditTicket = () => {
-    setEditTicketId(null);
-    setEditDescricao("");
-    setEditPrioridade("");
-    setEditComentario("");
+    setEditComentarioHTML("");
     setEditFiles([]);
   };
 
+  // Cancelar Edição
+  const cancelEditTicket = () => {
+    setEditTicketId(null);
+    setEditDescricaoHTML("");
+    setEditPrioridade("");
+    setEditComentarioHTML("");
+    setEditFiles([]);
+  };
+
+  // Salvar Edição
   const saveEditTicket = async (ticket) => {
     let newAttachments = ticket.attachments || [];
     if (editFiles.length > 0) {
@@ -159,16 +169,17 @@ const TicketList = ({ currentUser, activeTab, onSendEmail, calculateSLA }) => {
     }
 
     let newComentarios = ticket.comentarios || [];
-    if (editComentario.trim()) {
+    if (editComentarioHTML.trim()) {
+      // Armazenamos o comentário como HTML
       newComentarios.push({
         autor: ticket.nomeSolicitante || "Usuário",
-        texto: editComentario,
+        texto: editComentarioHTML,   // HTML do Quill
         createdAt: new Date().toISOString()
       });
     }
 
     const updateData = {
-      descricaoProblema: editDescricao,
+      descricaoProblema: editDescricaoHTML, // HTML do Quill
       prioridade: editPrioridade,
       attachments: newAttachments,
       comentarios: newComentarios
@@ -193,7 +204,7 @@ const TicketList = ({ currentUser, activeTab, onSendEmail, calculateSLA }) => {
     <div>
       <h2 className="text-xl font-bold mb-4">Meus Chamados</h2>
 
-      {/* Modal de Avaliação (Estrelas) */}
+      {/* Modal de Avaliação */}
       {showEvaluation && ticketToEvaluate && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center">
           <div className="bg-white p-4 rounded">
@@ -223,10 +234,10 @@ const TicketList = ({ currentUser, activeTab, onSendEmail, calculateSLA }) => {
 
       {tickets.map(ticket => {
         const isConcluido = (ticket.status === "Concluído");
-        const isAvaliado = !!ticket.avaliacao; // Se tiver valor, está avaliado
+        const isAvaliado = !!ticket.avaliacao;
 
         if (editTicketId === ticket.id) {
-          // -------- MODO EDIÇÃO --------
+          // ---------- EDIÇÃO ----------
           return (
             <div key={ticket.id} className="border rounded p-2 mb-2 bg-white">
               <p><strong>Status:</strong> {ticket.status}</p>
@@ -243,20 +254,20 @@ const TicketList = ({ currentUser, activeTab, onSendEmail, calculateSLA }) => {
                 ))}
               </select>
 
-              <label className="block font-semibold mt-2">Descrição do Problema:</label>
-              <textarea
-                className="border px-2 py-1 rounded w-full"
-                rows={3}
-                value={editDescricao}
-                onChange={(e) => setEditDescricao(e.target.value)}
+              <label className="block font-semibold mt-2">Descrição do Problema (Rich Text):</label>
+              <ReactQuill
+                value={editDescricaoHTML}
+                onChange={setEditDescricaoHTML}
+                theme="snow"
+                style={{ minHeight: "120px", backgroundColor: "#fff" }}
               />
 
-              <label className="block font-semibold mt-2">Adicionar Comentário:</label>
-              <textarea
-                className="border px-2 py-1 rounded w-full"
-                rows={2}
-                value={editComentario}
-                onChange={(e) => setEditComentario(e.target.value)}
+              <label className="block font-semibold mt-2">Adicionar Comentário (Rich Text):</label>
+              <ReactQuill
+                value={editComentarioHTML}
+                onChange={setEditComentarioHTML}
+                theme="snow"
+                style={{ minHeight: "80px", backgroundColor: "#fff" }}
               />
 
               <label className="block font-semibold mt-2">Anexar novos arquivos:</label>
@@ -284,36 +295,43 @@ const TicketList = ({ currentUser, activeTab, onSendEmail, calculateSLA }) => {
             </div>
           );
         } else {
-          // -------- VISUALIZAÇÃO COM A NOVA ORDEM --------
+          // ---------- VISUALIZAÇÃO ----------
           return (
             <div key={ticket.id} className="border rounded p-2 mb-2 bg-white">
-              {/* 1) Descrição */}
-              <p><strong>Descrição:</strong> {ticket.descricaoProblema}</p>
+              {/* Ordem de exibição: Descrição, Data de Abertura, Prioridade, Status, Comentários, Anexos */}
 
-              {/* 2) Data de Abertura */}
+              {/* Descrição (HTML) */}
+              <div>
+                <strong>Descrição:</strong>
+                <div
+                  style={{ fontSize: "0.95rem" }}
+                  dangerouslySetInnerHTML={{ __html: ticket.descricaoProblema }}
+                />
+              </div>
+
               <p><strong>Data de Abertura:</strong> {ticket.dataDeAbertura}</p>
-
-              {/* 3) Prioridade */}
               <p><strong>Prioridade:</strong> {ticket.prioridade}</p>
-
-              {/* 4) Status */}
               <p><strong>Status:</strong> {ticket.status}</p>
 
-              {/* 5) Comentários */}
+              {/* Comentários (HTML) */}
               {ticket.comentarios && ticket.comentarios.length > 0 && (
                 <div>
                   <strong>Comentários:</strong>
                   <ul style={{ fontSize: '0.9rem' }}>
                     {ticket.comentarios.map((com, idx) => (
                       <li key={idx} className="ml-4 list-disc">
-                        <strong>{com.autor}:</strong> {com.texto}
+                        <strong>{com.autor}:</strong>{" "}
+                        <div
+                          style={{ display: "inline-block" }}
+                          dangerouslySetInnerHTML={{ __html: com.texto }}
+                        />
                       </li>
                     ))}
                   </ul>
                 </div>
               )}
 
-              {/* 6) Anexos (azul, sublinhado, fonte menor) */}
+              {/* Anexos */}
               {ticket.attachments && ticket.attachments.length > 0 && (
                 <div>
                   <strong>Anexos:</strong>
@@ -338,10 +356,10 @@ const TicketList = ({ currentUser, activeTab, onSendEmail, calculateSLA }) => {
                 </div>
               )}
 
-              {/* Botões de ação */}
+              {/* Botões */}
               {isConcluido ? (
                 <div className="mt-2 flex gap-2">
-                  {/* Se já avaliado, não pode reabrir */}
+                  {/* Se avaliado, não mostra Reabrir */}
                   {!isAvaliado && (
                     <button
                       onClick={() => handleReopenTicket(ticket)}
@@ -350,11 +368,10 @@ const TicketList = ({ currentUser, activeTab, onSendEmail, calculateSLA }) => {
                       Reabrir Chamado
                     </button>
                   )}
-                  {/* Avaliação */}
                   {ticket.avaliacao ? (
                     <div>
                       <p className="inline-block mr-2">Chamado Avaliado:</p>
-                      <StarRating rating={ticket.avaliacao} setRating={() => {}} readOnly={true} />
+                      <StarRating rating={ticket.avaliacao} setRating={()=>{}} readOnly={true} />
                     </div>
                   ) : (
                     <button
