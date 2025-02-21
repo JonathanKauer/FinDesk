@@ -1,27 +1,34 @@
 // src/utils.js
 import React from 'react';
 
-// (1) Função para retornar o nome do autor do comentário
-export function getDisplayNameForComment(ticket, currentUser) {
+/**
+ * Retorna o nome correto do admin com base no e-mail.
+ * Se for user comum, retorna o nomeSolicitante do ticket.
+ */
+export function getDisplayName(ticket, currentUser) {
   if (!currentUser) return "Desconhecido";
 
   if (currentUser.isAdmin) {
-    // Mapeamento do e-mail do admin para o nome
-    const emailLower = (currentUser.email || "").toLowerCase();
-    if (emailLower === "jonathan.kauer@guiainvest.com.br") {
+    // Admin
+    const email = (currentUser.email || "").toLowerCase();
+    if (email === "jonathan.kauer@guiainvest.com.br") {
       return "Jonathan Kauer";
-    } else if (emailLower === "nayla.martins@guiainvest.com.br") {
+    } else if (email === "nayla.martins@guiainvest.com.br") {
       return "Nayla Martins";
-    } else {
-      return "Admin";
     }
+    return "Admin";
   } else {
-    // Usuário comum -> utiliza nomeSolicitante do ticket
+    // Usuário comum
     return ticket.nomeSolicitante || "Usuário";
   }
 }
 
-// (2) Componente simples de Rating (5 estrelas)
+/**
+ * Componente de Rating com até 5 estrelas.
+ * - rating: valor atual (1 a 5)
+ * - setRating: função para atualizar
+ * - readOnly: se true, não permite clicar
+ */
 export function StarRating({ rating, setRating, readOnly }) {
   const handleStarClick = (value) => {
     if (!readOnly && setRating) {
