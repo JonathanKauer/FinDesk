@@ -24,7 +24,6 @@ const TicketListAdmin = ({ activeTab, filterPriority, filterCategory, filterAten
     return () => unsubscribe();
   }, [activeTab, filterPriority, filterCategory, filterAtendente]);
 
-  // Função para deletar ticket
   const handleDeleteTicket = async (ticketId) => {
     try {
       await deleteDoc(doc(db, 'tickets', ticketId));
@@ -35,7 +34,7 @@ const TicketListAdmin = ({ activeTab, filterPriority, filterCategory, filterAten
     }
   };
 
-  // Exemplo: função para atualizar ticket (pode ser expandida conforme necessário)
+  // Exemplo de atualização administrativa – você pode expandir conforme necessário
   const handleUpdateTicket = async (ticket, updateData) => {
     try {
       await updateDoc(doc(db, 'tickets', ticket.id), updateData);
@@ -63,6 +62,8 @@ const TicketListAdmin = ({ activeTab, filterPriority, filterCategory, filterAten
             <p><strong>SLA:</strong> {calculateSLA(ticket.dataDeAberturaISO, ticket.dataResolucaoISO)}</p>
           )}
           <p><strong>Descrição:</strong> {ticket.descricaoProblema}</p>
+          <p><strong>Categoria:</strong> {ticket.categoria}</p>
+          <p><strong>Cargo/Departamento:</strong> {ticket.cargoDepartamento}</p>
           {ticket.attachments && ticket.attachments.length > 0 && (
             <div>
               <strong>Anexos:</strong>
@@ -79,7 +80,7 @@ const TicketListAdmin = ({ activeTab, filterPriority, filterCategory, filterAten
             <button onClick={() => handleDeleteTicket(ticket.id)} className="px-2 py-1 rounded bg-red-500 text-white">
               Excluir
             </button>
-            {/* Outras ações administrativas podem ser adicionadas aqui */}
+            {/* Você pode adicionar mais ações administrativas conforme necessário */}
           </div>
         </div>
       ))}
