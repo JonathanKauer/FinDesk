@@ -1,4 +1,3 @@
-// src/TicketList.jsx
 import React, { useState, useEffect } from 'react';
 import {
   collection,
@@ -64,7 +63,6 @@ const TicketList = ({ currentUser, activeTab, onSendEmail, calculateSLA }) => {
     return () => unsubscribe();
   }, [currentUser, activeTab]);
 
-  // Função de edição – adicionei um console.log para debug
   const startEditTicket = (ticket) => {
     console.log("Iniciando edição para ticket id:", ticket.id);
     setEditTicketId(ticket.id);
@@ -120,7 +118,6 @@ const TicketList = ({ currentUser, activeTab, onSendEmail, calculateSLA }) => {
     }
   };
 
-  // Reabrir chamado – se já avaliado, não permite reabertura
   const handleReopenTicket = async (ticket) => {
     if (ticket.avaliacao) {
       alert("Este chamado já foi avaliado e não pode ser reaberto.");
@@ -153,7 +150,6 @@ const TicketList = ({ currentUser, activeTab, onSendEmail, calculateSLA }) => {
     }
   };
 
-  // Avaliação via estrelas
   const handleEvaluateTicket = (ticket) => {
     setTicketToEvaluate(ticket);
     setRatingValue(ticket.avaliacao || 0);
@@ -211,7 +207,6 @@ const TicketList = ({ currentUser, activeTab, onSendEmail, calculateSLA }) => {
 
       {tickets.map(ticket => (
         <div key={ticket.id} className="border rounded p-2 mb-2 bg-white">
-          {/* Ordem para usuário: Descrição, Data de Abertura, Prioridade, Status, Comentários, Anexos */}
           <p><strong>Descrição:</strong> {ticket.descricaoProblema}</p>
           <p><strong>Data de Abertura:</strong> {ticket.dataDeAbertura}</p>
           <p><strong>Prioridade:</strong> {ticket.prioridade}</p>
