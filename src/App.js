@@ -16,6 +16,10 @@ import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import TicketList from './TicketList.js';
 import TicketListAdmin from './TicketListAdmin.js';
 
+// (1) Import do ReactQuill
+import ReactQuill from 'react-quill';          // <-- ReactQuill
+import 'react-quill/dist/quill.snow.css';      // <-- CSS básico do Quill
+
 const initialCargoOptions = [
   "Aquisição",
   "Backoffice",
@@ -77,7 +81,7 @@ function calculateSLA(dataDeAberturaISO, dataResolucaoISO) {
   return diffDays + " dia(s)";
 }
 
-// Envia e-mail (exemplo)
+// Envia e-mail (exemplo) 
 async function sendTicketUpdateEmail(ticket, updateDescription) {
   const subject = "Findesk: Atualização em chamado";
   const body =
@@ -136,11 +140,12 @@ function App() {
   const [adminFilterCategory, setAdminFilterCategory] = useState("");
   const [adminFilterAtendente, setAdminFilterAtendente] = useState("");
 
-  // Form de novo ticket
+  // Formulário de novo ticket
   const [showNewTicketForm, setShowNewTicketForm] = useState(false);
   const [newTicketNome, setNewTicketNome] = useState("");
   const [cargoDepartamento, setCargoDepartamento] = useState("");
-  const [descricaoProblema, setDescricaoProblema] = useState("");
+  // (2) Em vez de um useState para textarea, teremos um state para HTML do Quill
+  const [descricaoProblemaHTML, setDescricaoProblemaHTML] = useState(""); // <-- ReactQuill
   const [categoria, setCategoria] = useState("");
   const [prioridade, setPrioridade] = useState("");
   const [newTicketFiles, setNewTicketFiles] = useState([]);
@@ -167,7 +172,7 @@ function App() {
     return () => unsubscribe();
   }, []);
 
-  // Login
+  // ------ Funções de Login, Signup e Logout ------
   const handleLoginSubmit = (e) => {
     e.preventDefault();
     if (!loginEmail.trim() || !loginPassword.trim()) {
@@ -190,7 +195,6 @@ function App() {
       });
   };
 
-  // SignUp
   const handleSignUp = (e) => {
     e.preventDefault();
     if (!signupEmail.trim() || !signupPassword.trim()) {
@@ -198,7 +202,7 @@ function App() {
       return;
     }
     if (!signupEmail.toLowerCase().endsWith("@guiainvest.com.br")) {
-      alert("Somente e-mails do domínio @guiainvest.com.br são permitidos.");
+      alert("Somente emails do domínio @guiainvest.com.br são permitidos.");
       return;
     }
     createUserWithEmailAndPassword(auth, signupEmail, signupPassword)
@@ -239,7 +243,7 @@ function App() {
       });
   };
 
-  // Criação de novo ticket
+  // ------ CRIAÇÃO DE NOVO TICKET ------
   const handleCreateTicket = async (e) => {
     e.preventDefault();
     if (!newTicketNome.trim()) {
@@ -265,6 +269,7 @@ function App() {
     const prazoFinalizacaoDate = addBusinessDays(dataDeAbertura, daysToAdd);
     const prazoFinalizacao = prazoFinalizacaoDate.toISOString();
 
+    // Upload dos anexos
     let attachmentURLs = [];
     if (newTicketFiles.length > 0) {
       for (const file of newTicketFiles) {
@@ -273,21 +278,21 @@ function App() {
           await uploadBytes(storageRef, file);
           const downloadURL = await getDownloadURL(storageRef);
           attachmentURLs.push({ url: downloadURL, name: file.name });
-          console.log("Adicionado anexo:", file.name, "URL:", downloadURL);
-          console.log("attachmentURLs parcial:", attachmentURLs);
         } catch (error) {
           console.error("Erro ao fazer upload do arquivo:", error);
         }
       }
     }
 
+    // (3) Armazenamos descricaoProblema como HTML do Quill
     const newTicket = {
       id: ticketId,
       nomeSolicitante: newTicketNome,
       emailSolicitante: user.email,
       userId: user.uid,
       cargoDepartamento,
-      descricaoProblema,
+      // Em vez de "descricaoProblema: texto", agora é HTML gerado pelo Quill
+      descricaoProblema: descricaoProblemaHTML, // <-- aqui
       categoria,
       prioridade,
       dataDeAbertura: dataDeAberturaDisplay,
@@ -310,10 +315,10 @@ function App() {
       alert("Falha ao criar o ticket.");
     }
 
-    // Limpa formulário
+    // Limpa o formulário
     setNewTicketNome("");
     setCargoDepartamento("");
-    setDescricaoProblema("");
+    setDescricaoProblemaHTML(""); // zera o HTML do Quill
     setCategoria("");
     setPrioridade("");
     setNewTicketFiles([]);
@@ -342,6 +347,7 @@ function App() {
         </motion.h1>
       </div>
 
+      {/* Se não estiver logado, exibe tela de login/cadastro */}
       {!currentUser && (
         <div className="flex items-center justify-center">
           {isLoginScreen ? (
@@ -491,39 +497,6 @@ function App() {
                 Concluídos
               </button>
             </div>
-            {currentUser.isAdmin && modoAdmin && (
-              <div className="flex flex-col sm:flex-row items-center gap-2">
-                <select
-                  value={adminFilterPriority}
-                  onChange={(e) => setAdminFilterPriority(e.target.value)}
-                  className="border rounded px-2 py-1"
-                >
-                  <option value="">Prioridade: Todas</option>
-                  {priorityOptions.map((p, idx) => (
-                    <option key={idx} value={p}>{p}</option>
-                  ))}
-                </select>
-                <select
-                  value={adminFilterCategory}
-                  onChange={(e) => setAdminFilterCategory(e.target.value)}
-                  className="border rounded px-2 py-1"
-                >
-                  <option value="">Categoria: Todas</option>
-                  {categoryOptions.filter(cat => cat !== "+Novo").map((cat, idx) => (
-                    <option key={idx} value={cat}>{cat}</option>
-                  ))}
-                </select>
-                <select
-                  value={adminFilterAtendente}
-                  onChange={(e) => setAdminFilterAtendente(e.target.value)}
-                  className="border rounded px-2 py-1"
-                >
-                  <option value="">Atendente: Todos</option>
-                  <option value="Jonathan Kauer">Jonathan Kauer</option>
-                  <option value="Nayla Martins">Nayla Martins</option>
-                </select>
-              </div>
-            )}
           </div>
 
           {(!currentUser.isAdmin || (currentUser.isAdmin && !modoAdmin)) && (
@@ -538,6 +511,7 @@ function App() {
             </div>
           )}
 
+          {/* FORMULÁRIO DE CRIAÇÃO COM REACTQUILL */}
           {showNewTicketForm && (
             <motion.form
               className="bg-white shadow p-4 rounded-2xl w-full max-w-lg mx-auto mb-4"
@@ -582,16 +556,19 @@ function App() {
                   ))}
                 </select>
               </div>
+
+              {/* CAMPO DE DESCRIÇÃO DO PROBLEMA COM REACTQUILL */}
               <div className="mb-2">
-                <label className="block font-semibold">Descrição do Problema:</label>
-                <textarea
-                  value={descricaoProblema}
-                  onChange={(e) => setDescricaoProblema(e.target.value)}
-                  required
-                  className="border rounded px-2 py-1 w-full"
-                  rows="4"
+                <label className="block font-semibold">Descrição do Problema (Rich Text):</label>
+                <ReactQuill
+                  value={descricaoProblemaHTML}
+                  onChange={setDescricaoProblemaHTML}
+                  theme="snow"
+                  className="bg-white"
+                  style={{ minHeight: "150px" }}
                 />
               </div>
+
               <div className="mb-2">
                 <label className="block font-semibold">Categoria:</label>
                 <select
@@ -664,7 +641,7 @@ function App() {
                 filterAtendente={adminFilterAtendente}
                 onSendEmail={sendTicketUpdateEmail}
                 calculateSLA={calculateSLA}
-                currentUser={currentUser} // <-- Passa para o admin
+                currentUser={currentUser}
               />
             ) : (
               <TicketList
